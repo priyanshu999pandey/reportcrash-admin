@@ -12,20 +12,18 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export type HeaderProps = {
   onMenuClick: () => void
-  currentRole: AdminRole
 }
 
 export type SidebarProps = {
   isOpen: boolean
   onClose: () => void
-  currentRole: AdminRole
 }
 
 export type NavigationItem = {
   label: string
   path: string
   icon: LucideIcon
-  allowedRoles: readonly AdminRole[]
+  permission: string
 }
 
 export type DateRange = {
@@ -180,6 +178,65 @@ export interface SosAlertDetailsRow extends SosAlertRow {
 
 export type AdminRole = 'Super Admin' | 'Admin' | 'Content Admin'
 export type UserRole = AdminRole | 'User'
+
+export interface AuthPermission {
+  _id: string
+  key: string
+  module: string
+  name: string
+}
+
+export interface AuthAdminRole {
+  _id: string
+  name: string
+  slug: string
+  description?: string
+  permissions?: AuthPermission[]
+  isSystem?: boolean
+  isActive?: boolean
+  isDeleted?: boolean
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  name?: string
+  role: string
+  adminRole?: AuthAdminRole | null
+}
+
+export interface SendOtpResponse {
+  success: boolean
+  message: string
+  data: {
+    email: string
+    type: string
+  }
+}
+
+export interface VerifyOtpResponse {
+  success: boolean
+  message: string
+  data: {
+    token: string
+    type: string
+    user: AuthUser
+    adminRole?: AuthAdminRole | null
+  }
+}
+
+export interface RolesResponse {
+  success: boolean
+  message: string
+  data: AuthAdminRole[]
+}
+
+export interface AuthState {
+  token: string | null
+  user: AuthUser | null
+  adminRole: AuthAdminRole | null
+  isAuthenticated: boolean
+}
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete'
 export type PermissionModuleKey =
   | 'dashboard'
@@ -265,10 +322,6 @@ export interface UserProfileProps {
   currentRole: AdminRole
 }
 
-export interface LayoutProps {
-  currentRole: AdminRole
-}
-
 export interface UsersProps {
   currentRole: AdminRole
 }
@@ -278,8 +331,7 @@ export interface CreateUserProps {
 }
 
 export interface ProtectedRouteProps {
-  currentRole: AdminRole
-  allowedRoles: readonly AdminRole[]
+  requiredPermission?: string
 }
 
 export type SafetyTipStatus = 'Published' | 'Draft'

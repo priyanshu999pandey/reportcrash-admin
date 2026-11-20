@@ -12,28 +12,34 @@ import {
 } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import logo from '../../assets/Logo.svg'
+import { logout } from '../../store/authSlice'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import type { NavigationItem, SidebarProps } from '../../types'
-import { allAdminRoles, fullAccessRoles, getHomeRoute, superAdminRoles } from '../../utils/permissions'
+import { clearAuthSession, getAuthHomeRoute, hasAuthPermission } from '../../utils/auth'
 
 const navigationItems: NavigationItem[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, allowedRoles: fullAccessRoles },
-  { label: 'Accident Reports', path: '/accident-reports', icon: FileWarning, allowedRoles: fullAccessRoles },
-  { label: 'SOS Alerts', path: '/sos-alerts', icon: Siren, allowedRoles: fullAccessRoles },
-  { label: 'Users', path: '/users', icon: Users, allowedRoles: fullAccessRoles },
-  { label: 'Hospitals', path: '/hospitals', icon: Building2, allowedRoles: fullAccessRoles },
-  { label: 'Emergency Helpline', path: '/emergency-helplines', icon: PhoneCall, allowedRoles: fullAccessRoles },
-  { label: 'Roles & Permissions', path: '/roles-permissions', icon: KeyRound, allowedRoles: superAdminRoles },
-  { label: 'Safety & Tips', path: '/safety-tips', icon: ShieldCheck, allowedRoles: allAdminRoles },
+  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
+  { label: 'Accident Reports', path: '/accident-reports', icon: FileWarning, permission: 'reports:read' },
+  { label: 'SOS Alerts', path: '/sos-alerts', icon: Siren, permission: 'sos-alerts:read' },
+  { label: 'Users', path: '/users', icon: Users, permission: 'users:read' },
+  { label: 'Hospitals', path: '/hospitals', icon: Building2, permission: 'hospitals:read' },
+  { label: 'Emergency Helpline', path: '/emergency-helplines', icon: PhoneCall, permission: 'helplines:read' },
+  { label: 'Roles & Permissions', path: '/roles-permissions', icon: KeyRound, permission: 'roles:read' },
+  { label: 'Safety & Tips', path: '/safety-tips', icon: ShieldCheck, permission: 'safety-tips:read' },
 ]
 
-const Sidebar = ({ isOpen, onClose, currentRole }: SidebarProps) => {
+const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const { adminRole } = useAppSelector((state) => state.auth)
   const visibleItems = navigationItems.filter((item) =>
-    item.allowedRoles.includes(currentRole),
+    hasAuthPermission(adminRole, item.permission),
   )
 
   const handleLogout = () => {
     onClose()
+    clearAuthSession()
+    dispatch(logout())
     navigate('/login')
   }
 
@@ -54,7 +60,7 @@ const Sidebar = ({ isOpen, onClose, currentRole }: SidebarProps) => {
       >
         <div className="flex h-14 items-center justify-between border-b border-border px-5">
           <div>
-           <Link to={getHomeRoute(currentRole)}>
+           <Link to={getAuthHomeRoute(adminRole)}>
             <img
               src={logo}
               alt="Report Crash"

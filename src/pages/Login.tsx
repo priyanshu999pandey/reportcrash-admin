@@ -1,123 +1,277 @@
-
 import axios from 'axios'
-import { Eye, EyeOff } from 'lucide-react'
-import { useState, type SubmitEventHandler } from 'react'
-import Button from '../components/baseComponents/Button'
+import {
+  ArrowLeft,
+  LoaderCircle,
+  RefreshCw,
+} from 'lucide-react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+  type SubmitEventHandler,
+} from 'react'
+import { useNavigate } from 'react-router-dom'
 import logo from '../assets/Logo.svg'
 import loginBackground from '../assets/login_bg.webp'
-import { useNavigate } from 'react-router-dom'
+import Button from '../components/baseComponents/Button'
+import { apiUrls } from '../config/api'
+import { loginSuccess } from '../store/authSlice'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
+import type {
+  AuthAdminRole,
+  RolesResponse,
+  SendOtpResponse,
+  VerifyOtpResponse,
+} from '../types'
+import { getAuthHomeRoute, saveAuthSession } from '../utils/auth'
+
+const authenticationType = 'signin'
 
 const Login = () => {
   const navigate = useNavigate()
-  const [email, setEmail] = useState<string>('')
-  const [password, setPassword] = useState<string>('')
-  const [showPassword, setShowPassword] = useState<boolean>(false)
+  const dispatch = useAppDispatch()
+  const { isAuthenticated, adminRole } = useAppSelector((state) => state.auth)
+  const otpInputs = useRef<Array<HTMLInputElement | null>>([])
+  const [step, setStep] = useState<'email' | 'otp'>('email')
+  const [email, setEmail] = useState('')
+  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isResending, setIsResending] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
-  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
-    event.preventDefault()
+  useEffect(() => {
+    if (isAuthenticated) navigate(getAuthHomeRoute(adminRole), { replace: true })
+  }, [adminRole, isAuthenticated, navigate])
+
+  const requestOtp = async (isResend = false) => {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail) {
+      setError('Enter your admin email address.')
+      return
+    }
 
     try {
-      const credentials = { email, password }
+      if (isResend) setIsResending(true)
+      else setIsSubmitting(true)
+      setError('')
+      setMessage('')
 
-      console.log('Login credentials:', credentials)
-      navigate('/dashboard')
+      const response = await axios.post(apiUrls.sendOtp, {
+        email: normalizedEmail,
+      })
+      const result = response.data as SendOtpResponse
 
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        console.error('Login request failed:', error.message)
+      if (!result.success) {
+        setError(result.message || 'Unable to send OTP.')
         return
       }
 
-      console.error('Unexpected login error:', error)
+      setEmail(result.data.email || normalizedEmail)
+      setOtp(['', '', '', '', '', ''])
+      setStep('otp')
+      setMessage(result.message || 'OTP sent successfully.')
+      setTimeout(() => otpInputs.current[0]?.focus(), 0)
+    } catch (requestError: unknown) {
+      if (axios.isAxiosError(requestError)) {
+        setError(requestError.response?.data?.message ?? requestError.message)
+      } else {
+        setError('Unable to send OTP.')
+      }
+    } finally {
+      setIsSubmitting(false)
+      setIsResending(false)
     }
   }
 
+  const verifyOtp = async () => {
+    const code = otp.join('')
+    if (code.length !== 6) {
+      setError('Enter the complete 6-digit OTP.')
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      setError('')
+
+      const response = await axios.post(apiUrls.verifyOtp, {
+        email: email.trim().toLowerCase(),
+        otp: code,
+        type: authenticationType,
+      })
+      const result = response.data as VerifyOtpResponse
+
+      if (!result.success || !result.data.token) {
+        setError(result.message || 'OTP verification failed.')
+        return
+      }
+
+      if (result.data.user.role.trim().toLowerCase() !== 'admin') {
+        setError('Only admin accounts can access this panel.')
+        return
+      }
+
+      const assignedRole: AuthAdminRole | null =
+        result.data.adminRole ?? result.data.user.adminRole ?? null
+
+      if (!assignedRole) {
+        setError('No admin role is assigned to this account.')
+        return
+      }
+
+      const rolesResponse = await axios.get(apiUrls.roles, {
+        headers: { Authorization: `Bearer ${result.data.token}` },
+        params: { page: 1, limit: 100 },
+      })
+      const rolesResult = rolesResponse.data as RolesResponse
+      const matchedRole = rolesResult.data.find(
+        (role) =>
+          role._id === assignedRole._id || role.slug === assignedRole.slug,
+      )
+
+      if (!matchedRole) {
+        setError('The assigned admin role is not available.')
+        return
+      }
+
+      if (matchedRole.isActive === false || matchedRole.isDeleted === true) {
+        setError('No active admin role is assigned to this account.')
+        return
+      }
+
+      const authenticatedRole: AuthAdminRole = {
+        ...matchedRole,
+        permissions: matchedRole.permissions ?? [],
+        isActive: true,
+      }
+
+      const session = {
+        token: result.data.token,
+        user: result.data.user,
+        adminRole: authenticatedRole,
+        isAuthenticated: true,
+      }
+
+      saveAuthSession(session)
+      dispatch(
+        loginSuccess({
+          token: session.token,
+          user: session.user,
+          adminRole: session.adminRole,
+        }),
+      )
+      navigate(getAuthHomeRoute(authenticatedRole), { replace: true })
+    } catch (requestError: unknown) {
+      if (axios.isAxiosError(requestError)) {
+        setError(requestError.response?.data?.message ?? requestError.message)
+      } else {
+        setError('Unable to verify OTP.')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = (event) => {
+    event.preventDefault()
+    if (step === 'email') void requestOtp()
+    else void verifyOtp()
+  }
+
+  const updateOtp = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, '').slice(-1)
+    setOtp((currentOtp) =>
+      currentOtp.map((currentDigit, digitIndex) =>
+        digitIndex === index ? digit : currentDigit,
+      ),
+    )
+    setError('')
+    if (digit && index < 5) otpInputs.current[index + 1]?.focus()
+  }
+
+  const handleOtpKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>,
+    index: number,
+  ) => {
+    if (event.key === 'Backspace' && !otp[index] && index > 0) {
+      otpInputs.current[index - 1]?.focus()
+    }
+    if (event.key === 'ArrowLeft' && index > 0) {
+      otpInputs.current[index - 1]?.focus()
+    }
+    if (event.key === 'ArrowRight' && index < 5) {
+      otpInputs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleOtpPaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault()
+    const pastedCode = event.clipboardData
+      .getData('text')
+      .replace(/\D/g, '')
+      .slice(0, 6)
+    if (!pastedCode) return
+    const digits = Array.from({ length: 6 }, (_, index) => pastedCode[index] ?? '')
+    setOtp(digits)
+    otpInputs.current[Math.min(pastedCode.length, 6) - 1]?.focus()
+  }
+
+  const changeEmail = () => {
+    setStep('email')
+    setOtp(['', '', '', '', '', ''])
+    setError('')
+    setMessage('')
+  }
+
   return (
-    <div
-      className="relative flex min-h-screen items-center justify-center bg-cover bg-center px-5 py-10"
-      style={{ backgroundImage: `url(${loginBackground})` }}
-    >
+    <div className="relative flex min-h-screen items-center justify-center bg-cover bg-center px-5 py-10" style={{ backgroundImage: `url(${loginBackground})` }}>
       <div className="absolute inset-0 bg-text-overlay" />
 
-      <div
-        className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-white p-6 shadow-lg sm:p-10"
-      >
-        <img
-          src={logo}
-          alt="Report Crash"
-          className="mb-10 h-10 w-auto"
-          width="194"
-          height="40"
-        />
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-white p-6 shadow-lg sm:p-10">
+        <img src={logo} alt="Report Crash" className="mb-8 h-10 w-auto" width="194" height="40" />
 
-        <div className="mb-8">
-          <p className="mb-2 text-small font-bold tracking-widest text-accent uppercase">
-            Secure access
-          </p>
-
-          <h1
-        
-            className="text-title font-bold tracking-tight text-text"
-          >
-            Log in to your account
-          </h1>
-
-          <p className="mt-3 text-body leading-6 text-text-muted">
-            Enter your email and password to continue.
-          </p>
+        <div className="mb-7">
+          <p className="mb-2 text-small font-bold tracking-widest text-accent uppercase">Secure admin access</p>
+          <h1 className="m-0 text-title font-bold tracking-tight text-text">{step === 'email' ? 'Log in with email' : 'Verify your email'}</h1>
+          <p className="mt-3 mb-0 text-small leading-6 text-text-muted">{step === 'email' ? 'Enter your registered admin email and we will send you a one-time password.' : `Enter the 6-digit OTP sent to ${email}.`}</p>
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="email" className="mb-2 block text-body font-semibold text-text">
-              Email address
+          {step === 'email' ? (
+            <label className="block">
+              <span className="mb-2 block text-small font-semibold text-text">Email address</span>
+              <input name="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@example.com" required className="h-12 w-full rounded-lg border border-border bg-white px-4 text-body text-text outline-none transition placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary-soft" />
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              className="h-12 w-full rounded-lg border border-border bg-white px-4 text-body text-text outline-none transition placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary-soft"
-              placeholder="name@example.com"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="mb-2 block text-body font-semibold text-text">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                className="h-12 w-full rounded-lg border border-border bg-white px-4 pr-12 text-body text-text outline-none transition placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary-soft"
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((visible) => !visible)}
-                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-full border-0 bg-transparent text-text-muted transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                {showPassword ? (
-                  <EyeOff size={20} />
-                ) : (
-                  <Eye size={20} />
-                )}
-              </button>
+          ) : (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3"><span className="text-small font-semibold text-text">One-time password</span><button type="button" onClick={changeEmail} className="inline-flex items-center gap-1 text-tiny font-semibold text-primary"><ArrowLeft size={13} />Change email</button></div>
+              <div className="grid grid-cols-6 gap-2">
+                {otp.map((digit, index) => (
+                  <input key={index} ref={(element) => { otpInputs.current[index] = element }} type="text" inputMode="numeric" autoComplete={index === 0 ? 'one-time-code' : 'off'} maxLength={1} value={digit} onChange={(event) => updateOtp(index, event.target.value)} onKeyDown={(event) => handleOtpKeyDown(event, index)} onPaste={handleOtpPaste} className="h-12 min-w-0 rounded-lg border border-border bg-white text-center text-body font-bold text-text outline-none transition focus:border-primary focus:ring-3 focus:ring-primary-soft" />
+                ))}
+              </div>
             </div>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {message && !error && <p className="m-0 rounded-lg bg-chart-green-soft px-4 py-2.5 text-tiny font-medium text-chart-green-dark">{message}</p>}
+            {error && <p className="m-0 rounded-lg bg-accent-soft px-4 py-2.5 text-tiny font-medium text-accent">{error}</p>}
+
+            <Button type="submit" variant="red" fullWidth disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <LoaderCircle size={17} className="animate-spin" />}
+              {isSubmitting ? (step === 'email' ? 'Sending OTP...' : 'Verifying...') : step === 'email' ? 'Send OTP' : 'Verify & Log In'}
+            </Button>
           </div>
 
-          <Button type="submit" variant="red" fullWidth>
-            Log in
-          </Button>
+          {step === 'otp' && (
+            <button type="button" disabled={isResending} onClick={() => void requestOtp(true)} className="mx-auto flex items-center gap-2 text-tiny font-semibold text-primary disabled:opacity-60">
+              <RefreshCw size={14} className={isResending ? 'animate-spin' : ''} />
+              {isResending ? 'Resending OTP...' : 'Resend OTP'}
+            </button>
+          )}
         </form>
       </div>
     </div>

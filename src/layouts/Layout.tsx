@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Header from '../components/layout/Header'
 import Sidebar from '../components/layout/Sidebar'
-import type { LayoutProps } from '../types'
 
-const Layout = ({ currentRole }: LayoutProps) => {
+const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false)
 
   return (
@@ -12,12 +11,10 @@ const Layout = ({ currentRole }: LayoutProps) => {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        currentRole={currentRole}
       />
 
       <Header
         onMenuClick={() => setIsSidebarOpen(true)}
-        currentRole={currentRole}
       />
 
       <div className="min-h-screen pt-14 lg:pl-64">

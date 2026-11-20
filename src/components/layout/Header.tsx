@@ -1,7 +1,11 @@
 import { Bell, Menu, UserRound } from 'lucide-react'
+import { useAppSelector } from '../../store/hooks'
 import type { HeaderProps } from '../../types'
+import { getLegacyAdminRole } from '../../utils/auth'
 
-const Header = ({ onMenuClick, currentRole }: HeaderProps) => {
+const Header = ({ onMenuClick }: HeaderProps) => {
+  const { user, adminRole } = useAppSelector((state) => state.auth)
+  const currentRole = getLegacyAdminRole(adminRole)
   return (
     <div className="fixed top-0 right-0 left-0 z-30 flex h-14 items-center border-b border-border justify-between bg-white px-3 lg:left-64 lg:px-5">
       <button
@@ -30,8 +34,8 @@ const Header = ({ onMenuClick, currentRole }: HeaderProps) => {
             <UserRound size={19} strokeWidth={1.8} />
           </div>
           <div className="hidden sm:block">
-            <p className="m-0 text-small font-semibold leading-4 text-text">Admin</p>
-            <p className="m-0 text-small leading-4 text-text-muted">{currentRole}</p>
+            <p className="m-0 text-small font-semibold leading-4 text-text">{user?.name || 'Admin'}</p>
+            <p className="m-0 text-small leading-4 text-text-muted">{adminRole?.name || currentRole}</p>
           </div>
         </div>
       </div>
