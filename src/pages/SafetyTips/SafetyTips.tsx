@@ -1,0 +1,243 @@
+import axios from 'axios'
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Eye,
+  FilePenLine,
+  FileText,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Button from '../../components/baseComponents/Button'
+import FilterSelect from '../../components/baseComponents/FilterSelect'
+import SearchBar from '../../components/baseComponents/SearchBar'
+import StatisticCard from '../../components/baseComponents/StatisticCard'
+import Table from '../../components/baseComponents/Table'
+import { apiUrls } from '../../config/api'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
+import {
+  removeBlog,
+  setBlogError,
+  setBlogLoading,
+  setBlogs,
+} from '../../store/blogSlice'
+import type {
+  BlogListItem,
+  BlogListResponse,
+  SafetyTip,
+  TableColumn,
+  TableRow,
+} from '../../types'
+
+const columns: TableColumn[] = [
+  { key: 'number', header: '#' },
+  { key: 'blogId', header: 'Blog ID' },
+  { key: 'thumbnail', header: 'Thumbnail' },
+  { key: 'title', header: 'Title' },
+  { key: 'category', header: 'Category' },
+  { key: 'readTime', header: 'Read Time' },
+  { key: 'publishedAt', header: 'Published At' },
+  { key: 'actions', header: 'Actions' },
+]
+
+const formatPublishedDate = (value: string) =>
+  new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
+
+const createSafetyTip = (blog: BlogListItem): SafetyTip => ({
+  id: blog.id,
+  slug: blog.slug,
+  title: blog.title,
+  description: `<p>${blog.excerpt}</p>`,
+  image: blog.coverImage,
+  readTime: blog.readTime,
+  status: 'Published',
+  views: 0,
+  createdOn: formatPublishedDate(blog.publishedAt),
+  createdDate: blog.publishedAt.slice(0, 10),
+})
+
+const SafetyTips = () => {
+  const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const {
+    items: blogs,
+    isLoading,
+    error,
+  } = useAppSelector((state) => state.blogs)
+  const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [sortOrder, setSortOrder] = useState('latest')
+  const totalBlogs = blogs.length
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const loadBlogs = async () => {
+      dispatch(setBlogLoading(true))
+      dispatch(setBlogError(''))
+
+      try {
+        const response = await axios.get(apiUrls.blogs, { signal: controller.signal })
+        const result = response.data as BlogListResponse
+        dispatch(setBlogs(result.data))
+      } catch (requestError: unknown) {
+        if (axios.isCancel(requestError)) return
+        if (axios.isAxiosError(requestError)) {
+          dispatch(
+            setBlogError(
+              requestError.response?.data?.message ?? requestError.message,
+            ),
+          )
+        } else {
+          dispatch(setBlogError('Unable to load safety tips.'))
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          dispatch(setBlogLoading(false))
+        }
+      }
+    }
+
+    void loadBlogs()
+    return () => controller.abort()
+  }, [dispatch])
+
+  const categories = useMemo(
+    () => [...new Set(blogs.map((blog) => blog.category))],
+    [blogs],
+  )
+
+  const filteredBlogs = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const matchingBlogs = blogs.filter((blog) => {
+      const matchesSearch =
+        !query ||
+        blog.id.toLowerCase().includes(query) ||
+        blog.title.toLowerCase().includes(query) ||
+        blog.slug.toLowerCase().includes(query) ||
+        blog.excerpt.toLowerCase().includes(query) ||
+        blog.category.toLowerCase().includes(query)
+      const matchesCategory =
+        categoryFilter === 'all' || blog.category === categoryFilter
+
+      return matchesSearch && matchesCategory
+    })
+
+    return [...matchingBlogs].sort((first, second) => {
+      if (sortOrder === 'oldest') {
+        return first.publishedAt.localeCompare(second.publishedAt)
+      }
+      return second.publishedAt.localeCompare(first.publishedAt)
+    })
+  }, [blogs, categoryFilter, search, sortOrder])
+
+  const resetFilters = () => {
+    setSearch('')
+    setCategoryFilter('all')
+    setSortOrder('latest')
+  }
+
+  const deleteTip = (blogId: string) => {
+    if (!window.confirm('Remove this safety tip from the current list?')) return
+    dispatch(removeBlog(blogId))
+  }
+
+  const openTip = (blog: BlogListItem, mode: 'view' | 'edit') => {
+    const tip = createSafetyTip(blog)
+    navigate(`/safety-tips/${mode}/${blog.slug}`, { state: { tip } })
+  }
+
+  const tableRows: TableRow[] = filteredBlogs.map((blog, index) => ({
+    key: blog.id,
+    cells: {
+      number: index + 1,
+      blogId: <span className="font-medium text-text">{blog.id}</span>,
+      thumbnail: (
+        <img
+          src={blog.coverImage}
+          alt={blog.title}
+          className="h-12 w-20 rounded-lg object-cover"
+        />
+      ),
+      title: (
+        <span className="font-semibold text-text">{blog.title}</span>
+      ),
+      category: (
+        <span className="inline-flex rounded-full bg-primary-soft px-2.5 py-1 font-semibold text-primary capitalize">
+          {blog.category}
+        </span>
+      ),
+      readTime: (
+        <span className="inline-flex items-center gap-1.5 text-text">
+          <Clock3 size={15} className="text-text-muted" />
+          {blog.readTime} min
+        </span>
+      ),
+      publishedAt: formatPublishedDate(blog.publishedAt),
+      actions: (
+        <div className="flex items-center gap-1">
+          <button type="button" title="View safety tip" onClick={() => openTip(blog, 'view')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button>
+          <button type="button" title="Edit safety tip" onClick={() => openTip(blog, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={17} /></button>
+          <button type="button" title="Remove safety tip" onClick={() => deleteTip(blog.id)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft"><Trash2 size={17} /></button>
+        </div>
+      ),
+    },
+  }))
+
+  return (
+    <div className="min-h-[calc(100vh-3.5rem)] bg-primary-page p-4 sm:p-5 lg:p-6">
+      <div className="mx-auto max-w-[1440px]">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="m-0 text-title font-bold tracking-tight text-text">Road &amp; Safety Tips</h1>
+            <p className="mt-1 mb-0 text-small text-text-muted">Manage safety and awareness tips for users.</p>
+          </div>
+          <Button variant="red" size="small" onClick={() => navigate('/safety-tips/create')} className="gap-2 self-start sm:self-auto"><Plus size={16} />Create Safety Tip</Button>
+        </div>
+
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatisticCard id="total-tips" label="Total Tips" value={totalBlogs} icon={FileText} tone="accent" />
+          <StatisticCard id="published-tips" label="Published" value={totalBlogs} icon={CheckCircle2} tone="green" />
+          <StatisticCard id="draft-tips" label="Drafts" value={0} icon={FilePenLine} tone="amber" />
+        </div>
+
+        <div className="overflow-visible rounded-xl border border-border-soft bg-white shadow-sm">
+          <div className="grid gap-2 border-b border-border p-3 sm:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_10rem_10rem_auto]">
+            <SearchBar value={search} placeholder="Search by ID, title, slug, excerpt or category..." onChange={setSearch} />
+            <FilterSelect value={categoryFilter} options={[{ label: 'All Categories', value: 'all' }, ...categories.map((category) => ({ label: category, value: category }))]} onChange={setCategoryFilter} />
+            <FilterSelect value={sortOrder} options={[{ label: 'Latest First', value: 'latest' }, { label: 'Oldest First', value: 'oldest' }]} onChange={setSortOrder} />
+            <button type="button" title="Reset filters" onClick={resetFilters} className="h-8 rounded-md border border-primary-border bg-white px-3 text-tiny font-semibold text-primary transition-colors hover:bg-primary-hover">Reset</button>
+          </div>
+
+          {error && <p className="m-3 rounded-lg bg-accent-soft px-3 py-2 text-tiny font-medium text-accent">{error}</p>}
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 px-4 py-12 text-small text-text-muted"><LoaderCircle size={18} className="animate-spin text-primary" />Loading safety tips...</div>
+          ) : (
+            <Table columns={columns} rows={tableRows} />
+          )}
+
+          <div className="flex flex-col gap-3 border-t border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-1">
+              <button type="button" title="Previous page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronLeft size={15} /></button>
+              <span className="flex h-8 min-w-8 items-center justify-center rounded-md bg-primary px-2 text-tiny font-semibold text-white">1</span>
+              <button type="button" title="Next page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronRight size={15} /></button>
+            </div>
+            <p className="m-0 text-tiny text-text-muted">Showing {filteredBlogs.length === 0 ? 0 : 1}-{filteredBlogs.length} of {totalBlogs} tips</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default SafetyTips

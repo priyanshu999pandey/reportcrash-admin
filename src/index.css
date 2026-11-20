@@ -1,0 +1,78 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #d90429;
+  --color-primary-page: #fffafa;
+  --color-primary-faint: #fff6f7;
+  --color-primary-hover: #fef3f4;
+  --color-primary-soft: #fbe6ea;
+  --color-primary-border: #f3b8c2;
+  --color-accent: #d90429;
+  --color-accent-hover: #fef3f4;
+  --color-accent-soft: #fbe6ea;
+  --color-white: #ffffff;
+  --color-text: #1e1e1e;
+  --color-text-overlay: #1e1e1e59;
+  --color-text-backdrop: #1e1e1e66;
+  --color-text-strong: #1e1e1ee6;
+  --color-text-muted: #666666;
+  --color-border: #d9d9d9;
+  --color-border-faint: #e5e5e5;
+  --color-border-soft: #e1e1e1;
+  --color-chart-blue: #2563eb;
+  --color-chart-purple: #7c73d6;
+  --color-chart-amber: #ffb638;
+  --color-chart-amber-soft: #fff0d7;
+  --color-chart-green: #64c98b;
+  --color-chart-green-soft: #e0f4e8;
+  --color-chart-green-dark: #16824a;
+  --color-chart-navy: #354875;
+  --color-chart-red: #f04a34;
+  --color-chart-amber-dark: #a85b00;
+  --color-chart-gray: #69699a;
+
+  --font-sans: "Be Vietnam Pro", sans-serif;
+  --text-tiny: 12px;
+  --text-small: 13px;
+  --text-body: 16px;
+  --text-title: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--color-text);
+  background-color: var(--color-white);
+  font-family: var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+.jodit-container:not(.jodit_inline) {
+  border: 0;
+  font-family: var(--font-sans);
+}
+
+.jodit-toolbar__box:not(:empty) {
+  border-bottom-color: var(--color-border);
+  background-color: var(--color-primary-faint);
+}
+
+.jodit-wysiwyg {
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+
+
