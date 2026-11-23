@@ -45,6 +45,7 @@ import type {
   RolesResponse,
   TableColumn,
   TableRow,
+  UpdateRoleResponse,
 } from '../../types'
 
 const permissionModules: PermissionModule[] = [
@@ -277,27 +278,6 @@ const RolesPermissions = () => {
       return
     }
 
-    if (formMode === 'edit') {
-      const selectedRole = storedRoles.find((role) => role._id === selectedRoleId)
-      if (selectedRole) {
-        const selectedPermissionKeys = permissionModules.flatMap((module) =>
-          permissions[module.key]
-            .map((action) => backendPermissionKeys[module.key]?.[action])
-            .filter((key): key is string => Boolean(key)),
-        )
-        dispatch(updateStoredRole({
-          ...selectedRole,
-          name: roleName.trim(),
-          description: description.trim(),
-          permissions: storedPermissions.filter((permission) =>
-            selectedPermissionKeys.includes(permission.key),
-          ),
-        }))
-      }
-      resetForm()
-      return
-    }
-
     const selectedPermissionKeys = permissionModules.flatMap((module) =>
       permissions[module.key]
         .map((action) => backendPermissionKeys[module.key]?.[action])
@@ -312,16 +292,36 @@ const RolesPermissions = () => {
       return
     }
 
+    const requestPayload = {
+      name: roleName.trim(),
+      description: description.trim(),
+      permissions: selectedPermissionKeys.map(
+        (key) => permissionIdsByKey[key],
+      ),
+    }
+
     try {
       setIsSubmitting(true)
       setError('')
-      const response = await axios.post(apiUrls.createRole, {
-        name: roleName.trim(),
-        description: description.trim(),
-        permissions: selectedPermissionKeys.map(
-          (key) => permissionIdsByKey[key],
-        ),
-      })
+
+      if (formMode === 'edit') {
+        const response = await axios.put(
+          apiUrls.updateRole(selectedRoleId),
+          requestPayload,
+        )
+        const result = response.data as UpdateRoleResponse
+
+        if (!result.success) {
+          setError(result.message || 'Unable to update role.')
+          return
+        }
+
+        dispatch(updateStoredRole(result.data))
+        resetForm()
+        return
+      }
+
+      const response = await axios.post(apiUrls.createRole, requestPayload)
       const result = response.data as CreateRoleResponse
 
       if (!result.success) {
@@ -335,7 +335,7 @@ const RolesPermissions = () => {
       setError(
         axios.isAxiosError(requestError)
           ? (requestError.response?.data?.message ?? requestError.message)
-          : 'Unable to create role.',
+          : `Unable to ${formMode === 'edit' ? 'update' : 'create'} role.`,
       )
     } finally {
       setIsSubmitting(false)
@@ -393,7 +393,7 @@ const RolesPermissions = () => {
             </div>
             {error && <p className="m-0 rounded-lg bg-accent-soft px-3 py-2 text-tiny font-medium text-accent">{error}</p>}
           </div>
-          <div className="flex justify-end gap-2 border-t border-border p-3"><Button variant="outline" size="small" onClick={resetForm}>{isViewMode ? 'Close' : 'Cancel'}</Button>{!isViewMode && <Button type="submit" variant="red" size="small" disabled={isSubmitting} className="gap-2">{isSubmitting && <LoaderCircle size={15} className="animate-spin" />}{isSubmitting ? 'Creating...' : formMode === 'edit' ? 'Save Changes' : 'Create Role'}</Button>}</div>
+          <div className="flex justify-end gap-2 border-t border-border p-3"><Button variant="outline" size="small" onClick={resetForm}>{isViewMode ? 'Close' : 'Cancel'}</Button>{!isViewMode && <Button type="submit" variant="red" size="small" disabled={isSubmitting} className="gap-2">{isSubmitting && <LoaderCircle size={15} className="animate-spin" />}{isSubmitting ? formMode === 'edit' ? 'Updating...' : 'Creating...' : formMode === 'edit' ? 'Save Changes' : 'Create Role'}</Button>}</div>
         </form>
       </div>
     </div>

@@ -314,6 +314,8 @@ export interface CreateRoleResponse {
   data: AuthAdminRole
 }
 
+export type UpdateRoleResponse = CreateRoleResponse
+
 export interface RolesPermissionsState {
   roles: AuthAdminRole[]
   permissions: AuthPermission[]

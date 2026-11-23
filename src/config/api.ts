@@ -29,6 +29,7 @@ export const apiUrls = {
   verifyOtp: `${apiBaseUrl}/auth/verify-otp`,
   roles: `${apiBaseUrl}/role`,
   createRole: `${apiBaseUrl}/role/`,
+  updateRole: (roleId: string) => `${apiBaseUrl}/role/${roleId}`,
   accidentReports: `${apiBaseUrl}/accident/all`,
   accidentReportById: (reportId: string) =>
     `${apiBaseUrl}/accident/${reportId}`,
