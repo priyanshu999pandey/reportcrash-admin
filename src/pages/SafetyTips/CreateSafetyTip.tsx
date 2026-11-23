@@ -17,14 +17,16 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
 import { apiUrls } from '../../config/api'
-import { setLastCreatedBlog } from '../../store/blogSlice'
+import {
+  setLastCreatedBlog,
+  setUpdatedBlog,
+} from '../../store/blogSlice'
 import { useAppDispatch } from '../../store/hooks'
 import type {
-  CreateBlogPayload,
   CreateBlogResponse,
   SafetyTipFormProps,
   SafetyTipNavigationState,
-  SafetyTipStatus,
+  UpdateBlogResponse,
 } from '../../types'
 
 const editorButtons = [
@@ -74,16 +76,10 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
     existingTip?.description.replace(/<[^>]*>/g, '').trim() ?? '',
   )
   const [category, setCategory] = useState('Road Safety')
-  const [tags, setTags] = useState('Road Safety, Traffic Rules, Safe Driving')
-  const [authorName, setAuthorName] = useState('Crash Report Team')
-  const [authorDesignation, setAuthorDesignation] = useState('Road Safety Awareness')
   const [description, setDescription] = useState(existingTip?.description ?? '')
   const descriptionValueRef = useRef(existingTip?.description ?? '')
   const [readTime, setReadTime] = useState(
     existingTip ? String(existingTip.readTime) : '',
-  )
-  const [status, setStatus] = useState<SafetyTipStatus>(
-    existingTip?.status ?? 'Published',
   )
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState(existingTip?.image ?? '')
@@ -147,20 +143,12 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
       .replace(/&nbsp;/g, ' ')
       .trim()
 
-    const parsedTags = tags
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-
     if (
       !title.trim() ||
       !excerpt.trim() ||
       !plainDescription ||
-      !coverImage.trim() ||
+      (!imageFile && !coverImage.trim()) ||
       !category.trim() ||
-      parsedTags.length === 0 ||
-      !authorName.trim() ||
-      !authorDesignation.trim() ||
       !readTime
     ) {
       setError('Please complete all required fields.')
@@ -171,53 +159,45 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
       return
     }
 
-    if (isEditing) {
-      navigate('/safety-tips')
-      return
+    const formData = new FormData()
+    formData.append('title', title.trim())
+    formData.append('excerpt', excerpt.trim())
+    formData.append('content', latestDescription)
+    formData.append('category', category.trim())
+    formData.append('readTimeLabel', `${Number(readTime)} min read`)
+    formData.append('status', 'published')
+    if (imageFile) formData.append('coverImage', imageFile)
+    else if (!isEditing || coverImage.trim() !== existingTip?.image) {
+      formData.append('coverImage', coverImage.trim())
     }
-
-    const payload: CreateBlogPayload = {
-      title: title.trim(),
-      excerpt: excerpt.trim(),
-      content: latestDescription,
-      coverImage: coverImage.trim(),
-      category: category.trim(),
-      tags: parsedTags,
-      author: {
-        name: authorName.trim(),
-        designation: authorDesignation.trim(),
-      },
-      readTime: Number(readTime),
-      readTimeLabel: `${Number(readTime)} min read`,
-      status: status === 'Published' ? 'published' : 'draft',
-    }
-
-    const token =
-      localStorage.getItem('accessToken') ?? localStorage.getItem('token')
+    const requestFailureMessage = isEditing
+      ? 'Unable to update safety tip.'
+      : 'Unable to create safety tip.'
 
     try {
       setIsSubmitting(true)
-      const response = await axios.post(apiUrls.blogs, payload, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      })
-      const result = response.data as CreateBlogResponse
+      const response = isEditing
+        ? await axios.put(apiUrls.blogById(existingTip!.id), formData)
+        : await axios.post(apiUrls.blogs, formData)
+      const result = response.data as CreateBlogResponse | UpdateBlogResponse
 
       if (!result.success) {
-        setError(result.message || 'Unable to create safety tip.')
+        setError(result.message || requestFailureMessage)
         return
       }
 
-      dispatch(setLastCreatedBlog(result.data))
+      if (isEditing) dispatch(setUpdatedBlog(result.data))
+      else dispatch(setLastCreatedBlog(result.data))
       navigate('/safety-tips')
     } catch (requestError: unknown) {
       if (axios.isAxiosError(requestError)) {
         setError(
           requestError.response?.data?.message ??
             requestError.message ??
-            'Unable to create safety tip.',
+            requestFailureMessage,
         )
       } else {
-        setError('Unable to create safety tip.')
+        setError(requestFailureMessage)
       }
     } finally {
       setIsSubmitting(false)
@@ -287,7 +267,7 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
             />
           </label>
 
-          <label className="order-4 block">
+          <label className="order-4 block lg:col-span-2">
             <span className="mb-2 block text-small font-semibold text-text">
               Category <span className="text-primary">*</span>
             </span>
@@ -301,55 +281,9 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
             />
           </label>
 
-          <label className="order-5 block">
-            <span className="mb-2 block text-small font-semibold text-text">
-              Tags <span className="text-primary">*</span>
-            </span>
-            <input
-              type="text"
-              value={tags}
-              onChange={(event) => setTags(event.target.value)}
-              readOnly={isViewMode}
-              placeholder="Road Safety, Traffic Rules, Safe Driving"
-              className="h-11 w-full rounded-lg border border-border bg-white px-3 text-small text-text outline-none transition-colors focus:border-primary"
-            />
-            <span className="mt-1 block text-tiny text-text-muted">
-              Separate multiple tags with commas.
-            </span>
-          </label>
-
-          <div className="order-6 grid gap-3 lg:col-span-2 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-2 block text-small font-semibold text-text">
-                Author Name <span className="text-primary">*</span>
-              </span>
-              <input
-                type="text"
-                value={authorName}
-                onChange={(event) => setAuthorName(event.target.value)}
-                readOnly={isViewMode}
-                placeholder="Crash Report Team"
-                className="h-11 w-full rounded-lg border border-border bg-white px-3 text-small text-text outline-none transition-colors focus:border-primary"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-small font-semibold text-text">
-                Author Designation <span className="text-primary">*</span>
-              </span>
-              <input
-                type="text"
-                value={authorDesignation}
-                onChange={(event) => setAuthorDesignation(event.target.value)}
-                readOnly={isViewMode}
-                placeholder="Road Safety Awareness"
-                className="h-11 w-full rounded-lg border border-border bg-white px-3 text-small text-text outline-none transition-colors focus:border-primary"
-              />
-            </label>
-          </div>
-
           <div className="order-7">
             <p className="mb-2 text-small font-semibold text-text">
-              Description <span className="text-primary">*</span>
+              Content <span className="text-primary">*</span>
             </p>
             <div className="overflow-hidden rounded-lg border border-border bg-white focus-within:border-primary">
               <JoditEditor
@@ -370,7 +304,7 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
 
           <div className="order-8">
             <p className="mb-2 text-small font-semibold text-text">
-              Featured Image <span className="text-primary">*</span>
+              Cover Image <span className="text-primary">*</span>
             </p>
             <input
               type="url"
@@ -443,42 +377,6 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
             </span>
           </label>
 
-          <div className="order-9 lg:col-span-2">
-            <p className="mb-2 text-small font-semibold text-text">
-              Status <span className="text-primary">*</span>
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(['Published', 'Draft'] as const).map((option) => (
-                <label
-                  key={option}
-                  className={`flex items-center gap-3 rounded-xl border p-4 ${
-                    status === option
-                      ? 'border-primary bg-primary-faint'
-                      : 'border-border bg-white'
-                  } ${isViewMode ? 'cursor-default' : 'cursor-pointer'}`}
-                >
-                  <input
-                    type="radio"
-                    name="status"
-                    value={option}
-                    checked={status === option}
-                    disabled={isViewMode}
-                    onChange={() => setStatus(option)}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span>
-                    <span className="block text-small font-semibold text-text">{option}</span>
-                    <span className="mt-1 block text-tiny text-text-muted">
-                      {option === 'Published'
-                        ? 'Visible to users in the app'
-                        : 'Save as draft and keep it hidden'}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
           {error && (
             <p className="order-10 m-0 rounded-lg bg-accent-soft px-3 py-2 text-small font-medium text-accent lg:col-span-2">
               {error}
@@ -499,7 +397,9 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
                 <Button type="submit" variant="red" size="small" disabled={isSubmitting} className="gap-2">
                   {isSubmitting && <LoaderCircle size={15} className="animate-spin" />}
                   {isSubmitting
-                    ? 'Creating...'
+                    ? isEditing
+                      ? 'Updating...'
+                      : 'Creating...'
                     : isEditing
                       ? 'Update Safety Tip'
                       : 'Create Safety Tip'}

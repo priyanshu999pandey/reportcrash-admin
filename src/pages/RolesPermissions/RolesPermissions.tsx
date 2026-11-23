@@ -1,3 +1,4 @@
+import axios from 'axios'
 import {
   Building2,
   CheckCircle2,
@@ -7,6 +8,7 @@ import {
   FileWarning,
   KeyRound,
   LayoutDashboard,
+  LoaderCircle,
   Pencil,
   PhoneCall,
   ShieldCheck,
@@ -16,18 +18,31 @@ import {
   UserRound,
   Users,
 } from 'lucide-react'
-import { useMemo, useState, type SubmitEventHandler } from 'react'
+import { useEffect, useMemo, useState, type SubmitEventHandler } from 'react'
 import Button from '../../components/baseComponents/Button'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
 import SearchBar from '../../components/baseComponents/SearchBar'
 import StatisticCard from '../../components/baseComponents/StatisticCard'
 import Table from '../../components/baseComponents/Table'
+import { apiUrls } from '../../config/api'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
+import {
+  addRole,
+  removeStoredRole,
+  setRoles,
+  setRolesPermissionsError,
+  setRolesPermissionsLoading,
+  updateStoredRole,
+} from '../../store/rolePermissionSlice'
 import type {
+  AuthAdminRole,
+  CreateRoleResponse,
   PermissionAction,
   PermissionModule,
   PermissionModuleKey,
   RoleManagementItem,
   RolePermissionSelection,
+  RolesResponse,
   TableColumn,
   TableRow,
 } from '../../types'
@@ -43,26 +58,12 @@ const permissionModules: PermissionModule[] = [
   { key: 'emergencyHelplines', label: 'Emergency Helplines', description: 'Manage emergency helpline numbers.', icon: PhoneCall, actions: ['view', 'create', 'edit', 'delete'] },
 ]
 
-const fullPermissions: RolePermissionSelection = {
-  dashboard: ['view'], users: ['view', 'create', 'edit'], rolesPermissions: ['view', 'create', 'edit', 'delete'], accidentReports: ['view'], sosAlerts: ['view'], hospitals: ['view'], safetyTips: ['view', 'create', 'edit', 'delete'], emergencyHelplines: ['view', 'create', 'edit', 'delete'],
-}
-
-const contentPermissions: RolePermissionSelection = {
-  dashboard: [], users: [], rolesPermissions: [], accidentReports: [], sosAlerts: [], hospitals: [], safetyTips: ['view', 'create', 'edit', 'delete'], emergencyHelplines: [],
-}
-
 const emptyPermissions: RolePermissionSelection = {
   dashboard: [], users: [], rolesPermissions: [], accidentReports: [], sosAlerts: [], hospitals: [], safetyTips: [], emergencyHelplines: [],
 }
 
-const initialRoles: RoleManagementItem[] = [
-  { id: 'super-admin', name: 'Super Admin', description: 'Full access to all modules and settings.', users: 1, status: 'Active', createdOn: '02 Nov 2026', permissions: fullPermissions },
-  { id: 'admin', name: 'Admin', description: 'Manage users, hospitals, reports and helplines.', users: 5, status: 'Active', createdOn: '28 Oct 2026', permissions: fullPermissions },
-  { id: 'content-admin', name: 'Content Admin', description: 'Manage road and safety tips content.', users: 3, status: 'Active', createdOn: '15 Oct 2026', permissions: contentPermissions },
-]
-
 const columns: TableColumn[] = [
-  { key: 'number', header: '#' }, { key: 'role', header: 'Role Name' }, { key: 'users', header: 'Users' }, { key: 'status', header: 'Status' }, { key: 'createdOn', header: 'Created On' }, { key: 'actions', header: 'Actions' },
+  { key: 'number', header: '#' }, { key: 'role', header: 'Role Name' }, { key: 'permissions', header: 'Permissions' }, { key: 'status', header: 'Status' }, { key: 'createdOn', header: 'Created On' }, { key: 'actions', header: 'Actions' },
 ]
 
 const actionLabels: Record<PermissionAction, string> = { view: 'View', create: 'Create', edit: 'Edit', delete: 'Delete' }
@@ -71,8 +72,99 @@ const copyPermissions = (permissions: RolePermissionSelection): RolePermissionSe
   dashboard: [...permissions.dashboard], users: [...permissions.users], rolesPermissions: [...permissions.rolesPermissions], accidentReports: [...permissions.accidentReports], sosAlerts: [...permissions.sosAlerts], hospitals: [...permissions.hospitals], safetyTips: [...permissions.safetyTips], emergencyHelplines: [...permissions.emergencyHelplines],
 })
 
+const permissionModuleKeys: Record<string, PermissionModuleKey> = {
+  dashboard: 'dashboard',
+  users: 'users',
+  roles: 'rolesPermissions',
+  permissions: 'rolesPermissions',
+  reports: 'accidentReports',
+  'sos-alerts': 'sosAlerts',
+  hospitals: 'hospitals',
+  'safety-tips': 'safetyTips',
+  blogs: 'safetyTips',
+  helplines: 'emergencyHelplines',
+  'emergency-contacts': 'emergencyHelplines',
+}
+
+const permissionActions: Record<string, PermissionAction> = {
+  read: 'view',
+  create: 'create',
+  update: 'edit',
+  delete: 'delete',
+}
+
+const backendPermissionKeys: Partial<
+  Record<PermissionModuleKey, Partial<Record<PermissionAction, string>>>
+> = {
+  dashboard: { view: 'dashboard:read' },
+  users: {
+    view: 'users:read',
+    create: 'users:create',
+    edit: 'users:update',
+  },
+  rolesPermissions: {
+    view: 'roles:read',
+    create: 'roles:create',
+    edit: 'roles:update',
+    delete: 'roles:delete',
+  },
+  accidentReports: { view: 'reports:read' },
+  sosAlerts: { view: 'sos-alerts:read' },
+  hospitals: { view: 'hospitals:read' },
+  safetyTips: {
+    view: 'safety-tips:read',
+    create: 'safety-tips:create',
+    edit: 'safety-tips:update',
+    delete: 'safety-tips:delete',
+  },
+  emergencyHelplines: {
+    view: 'helplines:read',
+    create: 'helplines:create',
+    edit: 'helplines:update',
+    delete: 'helplines:delete',
+  },
+}
+
+const mapRolePermissions = (role: AuthAdminRole) => {
+  const mappedPermissions = copyPermissions(emptyPermissions)
+
+  role.permissions?.forEach((permission) => {
+    const [moduleName, actionName] = permission.key.split(':')
+    const moduleKey = permissionModuleKeys[moduleName]
+    const action = permissionActions[actionName]
+    if (!moduleKey || !action) return
+    if (!mappedPermissions[moduleKey].includes(action)) {
+      mappedPermissions[moduleKey].push(action)
+    }
+  })
+
+  return mappedPermissions
+}
+
+const mapApiRole = (role: AuthAdminRole): RoleManagementItem => ({
+  id: role._id,
+  name: role.name,
+  description: role.description || 'No role description available.',
+  permissionCount: role.permissions?.length ?? 0,
+  status: role.isActive === false ? 'Inactive' : 'Active',
+  createdOn: role.createdAt || role.updatedAt
+    ? new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date(role.createdAt ?? role.updatedAt))
+    : 'Not available',
+  permissions: mapRolePermissions(role),
+})
+
 const RolesPermissions = () => {
-  const [roles, setRoles] = useState(initialRoles)
+  const dispatch = useAppDispatch()
+  const {
+    roles: storedRoles,
+    permissions: storedPermissions,
+    isLoading,
+    error: loadError,
+  } = useAppSelector((state) => state.rolesPermissions)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'view'>('create')
@@ -81,6 +173,51 @@ const RolesPermissions = () => {
   const [description, setDescription] = useState('')
   const [permissions, setPermissions] = useState<RolePermissionSelection>(copyPermissions(emptyPermissions))
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const roles = useMemo(() => storedRoles.map(mapApiRole), [storedRoles])
+  const permissionIdsByKey = useMemo(
+    () =>
+      Object.fromEntries(
+        storedPermissions.map((permission) => [
+          permission.key,
+          permission._id,
+        ]),
+      ),
+    [storedPermissions],
+  )
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const loadRoles = async () => {
+      dispatch(setRolesPermissionsLoading(true))
+      dispatch(setRolesPermissionsError(''))
+
+      try {
+        const response = await axios.get(apiUrls.roles, {
+          signal: controller.signal,
+          params: { page: 1, limit: 100 },
+        })
+        const result = response.data as RolesResponse
+        dispatch(setRoles(result.data))
+      } catch (requestError: unknown) {
+        if (axios.isCancel(requestError)) return
+        dispatch(setRolesPermissionsError(
+          axios.isAxiosError(requestError)
+            ? (requestError.response?.data?.message ?? requestError.message)
+            : 'Unable to load roles.',
+        ))
+      } finally {
+        if (!controller.signal.aborted) {
+          dispatch(setRolesPermissionsLoading(false))
+        }
+      }
+    }
+
+    void loadRoles()
+    return () => controller.abort()
+  }, [dispatch])
 
   const filteredRoles = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -110,8 +247,8 @@ const RolesPermissions = () => {
   }
 
   const deleteRole = (role: RoleManagementItem) => {
-    if (role.id === 'super-admin' || !window.confirm(`Delete ${role.name}?`)) return
-    setRoles((currentRoles) => currentRoles.filter((currentRole) => currentRole.id !== role.id))
+    if (role.name === 'Super Admin' || !window.confirm(`Delete ${role.name}?`)) return
+    dispatch(removeStoredRole(role.id))
     if (selectedRoleId === role.id) resetForm()
   }
 
@@ -128,7 +265,7 @@ const RolesPermissions = () => {
     })
   }
 
-  const handleSubmit: SubmitEventHandler<HTMLFormElement> = (event) => {
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault()
     if (formMode === 'view') return
     if (!roleName.trim()) {
@@ -141,19 +278,68 @@ const RolesPermissions = () => {
     }
 
     if (formMode === 'edit') {
-      setRoles((currentRoles) => currentRoles.map((role) => role.id === selectedRoleId ? { ...role, name: roleName.trim(), description: description.trim(), permissions: copyPermissions(permissions) } : role))
-    } else {
-      setRoles((currentRoles) => [...currentRoles, {
-        id: `role-${Date.now()}`,
-        name: roleName.trim(),
-        description: description.trim() || 'Custom admin role.',
-        users: 0,
-        status: 'Active',
-        createdOn: new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date()),
-        permissions: copyPermissions(permissions),
-      }])
+      const selectedRole = storedRoles.find((role) => role._id === selectedRoleId)
+      if (selectedRole) {
+        const selectedPermissionKeys = permissionModules.flatMap((module) =>
+          permissions[module.key]
+            .map((action) => backendPermissionKeys[module.key]?.[action])
+            .filter((key): key is string => Boolean(key)),
+        )
+        dispatch(updateStoredRole({
+          ...selectedRole,
+          name: roleName.trim(),
+          description: description.trim(),
+          permissions: storedPermissions.filter((permission) =>
+            selectedPermissionKeys.includes(permission.key),
+          ),
+        }))
+      }
+      resetForm()
+      return
     }
-    resetForm()
+
+    const selectedPermissionKeys = permissionModules.flatMap((module) =>
+      permissions[module.key]
+        .map((action) => backendPermissionKeys[module.key]?.[action])
+        .filter((key): key is string => Boolean(key)),
+    )
+    const missingPermission = selectedPermissionKeys.find(
+      (key) => !permissionIdsByKey[key],
+    )
+
+    if (missingPermission) {
+      setError(`Permission ${missingPermission} is unavailable.`)
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      setError('')
+      const response = await axios.post(apiUrls.createRole, {
+        name: roleName.trim(),
+        description: description.trim(),
+        permissions: selectedPermissionKeys.map(
+          (key) => permissionIdsByKey[key],
+        ),
+      })
+      const result = response.data as CreateRoleResponse
+
+      if (!result.success) {
+        setError(result.message || 'Unable to create role.')
+        return
+      }
+
+      dispatch(addRole(result.data))
+      resetForm()
+    } catch (requestError: unknown) {
+      setError(
+        axios.isAxiosError(requestError)
+          ? (requestError.response?.data?.message ?? requestError.message)
+          : 'Unable to create role.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const tableRows: TableRow[] = filteredRoles.map((role, index) => ({
@@ -161,10 +347,10 @@ const RolesPermissions = () => {
     cells: {
       number: index + 1,
       role: <div><span className="block font-semibold text-text">{role.name}</span><span className="mt-1 block max-w-52 text-tiny leading-5 text-text-muted">{role.description}</span></div>,
-      users: role.users,
+      permissions: role.permissionCount,
       status: <span className="inline-flex items-center gap-1.5 rounded-full bg-chart-green-soft px-2.5 py-1 font-semibold text-chart-green-dark"><span className="h-1.5 w-1.5 rounded-full bg-chart-green-dark" />{role.status}</span>,
       createdOn: role.createdOn,
-      actions: <div className="flex items-center gap-1"><button type="button" title="View role" onClick={() => openRole(role, 'view')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button><button type="button" title="Edit role" onClick={() => openRole(role, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={16} /></button><button type="button" title="Delete role" disabled={role.id === 'super-admin'} onClick={() => deleteRole(role)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={16} /></button></div>,
+      actions: <div className="flex items-center gap-1"><button type="button" title="View role" onClick={() => openRole(role, 'view')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button><button type="button" title="Edit role" onClick={() => openRole(role, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={16} /></button><button type="button" title="Delete role" disabled={role.name === 'Super Admin'} onClick={() => deleteRole(role)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={16} /></button></div>,
     },
   }))
 
@@ -185,7 +371,8 @@ const RolesPermissions = () => {
               <div className="mb-3"><h2 className="m-0 text-body font-bold text-text">Roles</h2><p className="mt-1 mb-0 text-tiny text-text-muted">List of all roles with their details and status.</p></div>
               <div className="grid gap-2 sm:grid-cols-[1fr_9rem]"><SearchBar value={search} placeholder="Search by role name..." onChange={setSearch} /><FilterSelect value={statusFilter} options={[{ label: 'All Status', value: 'all' }, { label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} onChange={setStatusFilter} /></div>
             </div>
-            <Table columns={columns} rows={tableRows} />
+            {loadError && <p className="m-3 rounded-lg bg-accent-soft px-3 py-2 text-tiny font-medium text-accent">{loadError}</p>}
+            {isLoading ? <div className="flex min-h-40 items-center justify-center gap-2 text-small text-text-muted"><LoaderCircle size={18} className="animate-spin text-primary" />Loading roles...</div> : <Table columns={columns} rows={tableRows} />}
             <div className="flex items-center justify-between gap-3 border-t border-border p-3"><p className="m-0 text-tiny font-semibold text-text-muted">Showing {filteredRoles.length === 0 ? 0 : 1} – {filteredRoles.length} of {filteredRoles.length} roles</p><div className="flex items-center gap-1"><button type="button" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronLeft size={15} /></button><span className="flex h-8 min-w-8 items-center justify-center rounded-md bg-primary px-2 text-tiny font-semibold text-white">1</span><button type="button" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronRight size={15} /></button></div></div>
           </div>
         </div>
@@ -200,13 +387,13 @@ const RolesPermissions = () => {
               <div className="space-y-2">
                 {permissionModules.map((module) => {
                   const Icon = module.icon
-                  return <div key={module.key} className="grid gap-2 rounded-lg border border-border-soft p-2 sm:grid-cols-[minmax(9rem,1fr)_auto] sm:items-center"><div className="flex min-w-0 items-start gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={15} /></span><div className="min-w-0"><p className="m-0 text-tiny font-bold text-text">{module.label}</p><p className="mt-0.5 mb-0 text-tiny leading-4 text-text-muted">{module.description}</p></div></div><div className="flex flex-wrap gap-x-2 gap-y-1 sm:justify-end">{module.actions.map((action) => <label key={action} className={`inline-flex items-center gap-1 text-tiny font-medium text-text ${isViewMode ? 'cursor-default' : 'cursor-pointer'}`}><input type="checkbox" checked={permissions[module.key].includes(action)} disabled={isViewMode} onChange={() => togglePermission(module.key, action)} className="h-4 w-4 accent-primary" />{actionLabels[action]}</label>)}</div></div>
+                  return <div key={module.key} className="grid gap-2 rounded-lg border border-border-soft p-2 sm:grid-cols-[minmax(9rem,1fr)_auto] sm:items-center"><div className="flex min-w-0 items-start gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={15} /></span><div className="min-w-0"><p className="m-0 text-tiny font-bold text-text">{module.label}</p><p className="mt-0.5 mb-0 text-tiny leading-4 text-text-muted">{module.description}</p></div></div><div className="flex flex-wrap gap-x-2 gap-y-1 sm:justify-end">{module.actions.map((action) => { const permissionKey = backendPermissionKeys[module.key]?.[action]; const isUnavailable = formMode === 'create' && (!permissionKey || !permissionIdsByKey[permissionKey]); return <label key={action} className={`inline-flex items-center gap-1 text-tiny font-medium text-text ${isViewMode || isUnavailable ? 'cursor-default opacity-50' : 'cursor-pointer'}`}><input type="checkbox" checked={permissions[module.key].includes(action)} disabled={isViewMode || isUnavailable} onChange={() => togglePermission(module.key, action)} className="h-4 w-4 accent-primary" />{actionLabels[action]}</label> })}</div></div>
                 })}
               </div>
             </div>
             {error && <p className="m-0 rounded-lg bg-accent-soft px-3 py-2 text-tiny font-medium text-accent">{error}</p>}
           </div>
-          <div className="flex justify-end gap-2 border-t border-border p-3"><Button variant="outline" size="small" onClick={resetForm}>{isViewMode ? 'Close' : 'Cancel'}</Button>{!isViewMode && <Button type="submit" variant="red" size="small">{formMode === 'edit' ? 'Save Changes' : 'Create Role'}</Button>}</div>
+          <div className="flex justify-end gap-2 border-t border-border p-3"><Button variant="outline" size="small" onClick={resetForm}>{isViewMode ? 'Close' : 'Cancel'}</Button>{!isViewMode && <Button type="submit" variant="red" size="small" disabled={isSubmitting} className="gap-2">{isSubmitting && <LoaderCircle size={15} className="animate-spin" />}{isSubmitting ? 'Creating...' : formMode === 'edit' ? 'Save Changes' : 'Create Role'}</Button>}</div>
         </form>
       </div>
     </div>

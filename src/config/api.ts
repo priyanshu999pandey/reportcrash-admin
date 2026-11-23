@@ -28,7 +28,15 @@ export const apiUrls = {
   sendOtp: `${apiBaseUrl}/auth/send-otp`,
   verifyOtp: `${apiBaseUrl}/auth/verify-otp`,
   roles: `${apiBaseUrl}/role`,
+  createRole: `${apiBaseUrl}/role/`,
+  accidentReports: `${apiBaseUrl}/accident/all`,
+  accidentReportById: (reportId: string) =>
+    `${apiBaseUrl}/accident/${reportId}`,
+  deleteAccidentReport: (reportId: string) =>
+    `${apiBaseUrl}/accident/${reportId}`,
   blogs: `${apiBaseUrl}/blogs`,
+  blogById: (blogId: string) => `${apiBaseUrl}/blogs/${blogId}`,
+  deleteBlog: (blogId: string) => `${apiBaseUrl}/blogs/${blogId}`,
   helplines: `${apiBaseUrl}/helpline/`,
   nearbyHospitals: `${apiBaseUrl}/hospital/nearby?latitude=28.6139&longitude=77.2090&limit=10`,
 }

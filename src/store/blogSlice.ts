@@ -24,6 +24,8 @@ const blogSlice = createSlice({
     },
     setBlogs: (state, action: PayloadAction<BlogListItem[]>) => {
       state.items = action.payload
+        .filter((blog) => !blog.status || blog.status === 'published')
+        .map((blog) => ({ ...blog, status: 'published' }))
       state.error = ''
     },
     removeBlog: (state, action: PayloadAction<string>) => {
@@ -34,6 +36,44 @@ const blogSlice = createSlice({
       action: PayloadAction<CreateBlogResponse['data']>,
     ) => {
       state.lastCreatedBlog = action.payload
+      const createdBlog: BlogListItem = {
+        id: action.payload._id,
+        title: action.payload.title,
+        slug: action.payload.slug,
+        excerpt: action.payload.excerpt,
+        coverImage: action.payload.coverImage ?? '',
+        category: action.payload.category,
+        readTime: action.payload.readTime,
+        status: 'published',
+        publishedAt:
+          action.payload.publishedAt ?? action.payload.createdAt,
+      }
+      state.items = [
+        createdBlog,
+        ...state.items.filter((blog) => blog.id !== createdBlog.id),
+      ]
+    },
+    setUpdatedBlog: (
+      state,
+      action: PayloadAction<CreateBlogResponse['data']>,
+    ) => {
+      const updatedBlog: BlogListItem = {
+        id: action.payload._id,
+        title: action.payload.title,
+        slug: action.payload.slug,
+        excerpt: action.payload.excerpt,
+        coverImage: action.payload.coverImage,
+        category: action.payload.category,
+        readTime: action.payload.readTime,
+        status: 'published',
+        publishedAt:
+          action.payload.publishedAt ?? action.payload.createdAt,
+      }
+      const blogIndex = state.items.findIndex(
+        (blog) => blog.id === updatedBlog.id,
+      )
+      if (blogIndex >= 0) state.items[blogIndex] = updatedBlog
+      else state.items.unshift(updatedBlog)
     },
   },
 })
@@ -44,6 +84,7 @@ export const {
   setBlogLoading,
   setBlogs,
   setLastCreatedBlog,
+  setUpdatedBlog,
 } = blogSlice.actions
 
 export default blogSlice.reducer

@@ -1,12 +1,21 @@
-import { FileText, Hospital, Siren, Users } from "lucide-react";
+import axios from "axios";
+import { FileText, Hospital, LoaderCircle, Siren, Users } from "lucide-react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import Table from "../components/baseComponents/Table";
 import AccidentReportsTrend from "../components/dashboard/AccidentReportsTrend";
 import AccidentTypeDistribution from "../components/dashboard/AccidentTypeDistribution";
 import DateRangePicker from "../components/baseComponents/DateRangePicker";
 import StatisticCard from "../components/baseComponents/StatisticCard";
+import { apiUrls } from "../config/api";
+import {
+  setAccidentReports,
+  setAccidentReportsError,
+  setAccidentReportsLoading,
+} from "../store/accidentReportSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
 import type {
-  AccidentReportRow,
+  AccidentReportsApiResponse,
   SosAlertRow,
   TableColumn,
   TableRow,
@@ -53,37 +62,6 @@ const trendMockData: Record<TrendPeriod, TrendPoint[]> = {
     { label: "02 Nov", reports: 88 },
   ],
 };
-
-const recentAccidentReports: AccidentReportRow[] = [
-  {
-    reportId: "RA-2026-000123",
-    accidentType: "Multi-Vehicle",
-    location: "Delhi, India",
-    date: "25 Jun 2026",
-    time: "04:50 PM",
-  },
-  {
-    reportId: "RA-2026-000122",
-    accidentType: "Bike Accident",
-    location: "Gurugram, India",
-    date: "25 Jun 2026",
-    time: "03:20 PM",
-  },
-  {
-    reportId: "RA-2026-000121",
-    accidentType: "Hit & Run",
-    location: "Noida, India",
-    date: "25 Jun 2026",
-    time: "02:18 PM",
-  },
-  {
-    reportId: "RA-2026-000120",
-    accidentType: "Pedestrian",
-    location: "Faridabad, India",
-    date: "25 Jun 2026",
-    time: "01:05 PM",
-  },
-];
 
 const recentSosAlerts: SosAlertRow[] = [
   {
@@ -154,23 +132,6 @@ const recentSosColumns: TableColumn[] = [
   },
 ];
 
-const recentAccidentTableRows: TableRow[] = recentAccidentReports.map(
-  (report) => ({
-    key: report.reportId,
-    cells: {
-      "report-id": report.reportId,
-      "accident-type": report.accidentType,
-      location: report.location,
-      "date-time": (
-        <>
-          <span className="block">{report.date}</span>
-          <span className="block">{report.time}</span>
-        </>
-      ),
-    },
-  }),
-);
-
 const recentSosTableRows: TableRow[] = recentSosAlerts.map((alert, index) => ({
   key: alert.id,
   cells: {
@@ -187,6 +148,103 @@ const recentSosTableRows: TableRow[] = recentSosAlerts.map((alert, index) => ({
 }));
 
 const Dashboard = () => {
+  const dispatch = useAppDispatch();
+  const {
+    items: accidentReports,
+    total: totalAccidentReports,
+    isLoading: areAccidentReportsLoading,
+    error: accidentReportsError,
+  } = useAppSelector((state) => state.accidentReports);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadAccidentReports = async () => {
+      dispatch(setAccidentReportsLoading(true));
+      dispatch(setAccidentReportsError(""));
+
+      try {
+        const response = await axios.get(apiUrls.accidentReports, {
+          signal: controller.signal,
+        });
+        const result = response.data as AccidentReportsApiResponse;
+        dispatch(
+          setAccidentReports({
+            items: result.data.filter((report) => !report.isDeleted),
+            total: result.count,
+          }),
+        );
+      } catch (requestError: unknown) {
+        if (axios.isCancel(requestError)) return;
+        dispatch(
+          setAccidentReportsError(
+            axios.isAxiosError(requestError)
+              ? (requestError.response?.data?.message ?? requestError.message)
+              : "Unable to load accident reports.",
+          ),
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          dispatch(setAccidentReportsLoading(false));
+        }
+      }
+    };
+
+    void loadAccidentReports();
+    return () => controller.abort();
+  }, [dispatch]);
+
+  const recentAccidentTableRows: TableRow[] = [...accidentReports]
+    .sort((first, second) => second.createdAt.localeCompare(first.createdAt))
+    .slice(0, 4)
+    .map((report) => {
+      const reportedAt = new Date(report.createdAt);
+      const location = [
+        report.location.address,
+        report.location.city,
+        report.location.state,
+      ]
+        .filter(
+          (value, index, values) => value && values.indexOf(value) === index,
+        )
+        .join(", ");
+
+      return {
+        key: report._id,
+        cells: {
+          "report-id": (
+            <Link
+              to={`/accident-reports/view/${report._id}`}
+              className="font-semibold text-primary hover:underline"
+            >
+              {report._id}
+            </Link>
+          ),
+          "accident-type": report.accidentType
+            .replaceAll("_", " ")
+            .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+          location,
+          "date-time": (
+            <>
+              <span className="block">
+                {reportedAt.toLocaleDateString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+              <span className="block">
+                {reportedAt.toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </>
+          ),
+        },
+      };
+    });
+
   return (
     <section className="min-h-[calc(100vh-3.5rem)] bg-primary-page p-4 sm:p-5 lg:p-6">
       <div className="mx-auto max-w-[1440px]">
@@ -207,7 +265,7 @@ const Dashboard = () => {
           <StatisticCard
             id="total-reports"
             label="Total Reports"
-            value={1248}
+            value={totalAccidentReports}
             icon={FileText}
             tone="primary"
           />
@@ -242,7 +300,7 @@ const Dashboard = () => {
           />
 
           <AccidentTypeDistribution
-            total={1248}
+            total={totalAccidentReports}
             multiVehicleCollision={28}
             bikeAccident={20}
             hitAndRun={18}
@@ -266,10 +324,21 @@ const Dashboard = () => {
                 View All
               </Link>
             </div>
-            <Table
-              columns={recentAccidentColumns}
-              rows={recentAccidentTableRows}
-            />
+            {areAccidentReportsLoading ? (
+              <div className="flex min-h-40 items-center justify-center gap-2 text-small text-text-muted">
+                <LoaderCircle size={18} className="animate-spin text-primary" />
+                Loading accident reports...
+              </div>
+            ) : accidentReportsError ? (
+              <p className="rounded-lg bg-accent-soft px-3 py-3 text-tiny font-medium text-accent">
+                {accidentReportsError}
+              </p>
+            ) : (
+              <Table
+                columns={recentAccidentColumns}
+                rows={recentAccidentTableRows}
+              />
+            )}
           </section>
 
           <section className="min-w-0 rounded-xl border border-border-soft bg-white p-4 shadow-sm">

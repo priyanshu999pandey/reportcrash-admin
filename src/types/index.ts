@@ -158,6 +158,68 @@ export type AccidentReportNavigationState = {
   report: AccidentReportDetailsRow
 }
 
+export interface AccidentReportApiLocation {
+  latitude: number
+  longitude: number
+  address: string
+  city: string
+  state: string
+}
+
+export interface AccidentReportApiReporter {
+  _id: string
+  email: string
+  name: string
+  phone: string
+}
+
+export interface AccidentReportApiItem {
+  _id: string
+  location: AccidentReportApiLocation
+  reportedBy: AccidentReportApiReporter
+  accidentType: string
+  injurySeverity?: string
+  personsInvolved?: number
+  anyoneTrapped: string
+  additionalInformation: string
+  photos: string[]
+  videos: string[]
+  voiceNote: string | null
+  status: string
+  isDeleted: boolean
+  deletedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AccidentReportsApiResponse {
+  success: boolean
+  message: string
+  count: number
+  data: AccidentReportApiItem[]
+}
+
+export interface AccidentReportApiResponse {
+  success: boolean
+  message: string
+  data: AccidentReportApiItem
+}
+
+export interface DeleteAccidentReportResponse {
+  success: boolean
+  message: string
+}
+
+export interface AccidentReportsState {
+  items: AccidentReportApiItem[]
+  total: number
+  selectedReport: AccidentReportApiItem | null
+  isLoading: boolean
+  error: string
+  isDetailLoading: boolean
+  detailError: string
+}
+
 export type SosAlertRow = {
   id: string
   user: string
@@ -195,6 +257,15 @@ export interface AuthAdminRole {
   isSystem?: boolean
   isActive?: boolean
   isDeleted?: boolean
+  createdAt?: string
+  updatedAt?: string
+  createdBy?:
+    | string
+    | {
+        _id: string
+        email: string
+        name: string
+      }
 }
 
 export interface AuthUser {
@@ -229,6 +300,25 @@ export interface RolesResponse {
   success: boolean
   message: string
   data: AuthAdminRole[]
+  pagination?: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+
+export interface CreateRoleResponse {
+  success: boolean
+  message: string
+  data: AuthAdminRole
+}
+
+export interface RolesPermissionsState {
+  roles: AuthAdminRole[]
+  permissions: AuthPermission[]
+  isLoading: boolean
+  error: string
 }
 
 export interface AuthState {
@@ -265,7 +355,7 @@ export interface RoleManagementItem {
   id: string
   name: string
   description: string
-  users: number
+  permissionCount: number
   status: 'Active' | 'Inactive'
   createdOn: string
   permissions: RolePermissionSelection
@@ -334,8 +424,6 @@ export interface ProtectedRouteProps {
   requiredPermission?: string
 }
 
-export type SafetyTipStatus = 'Published' | 'Draft'
-
 export interface SafetyTip {
   id: string
   slug?: string
@@ -343,7 +431,7 @@ export interface SafetyTip {
   description: string
   image: string
   readTime: number
-  status: SafetyTipStatus
+  status: 'Published'
   views: number
   createdOn: string
   createdDate: string
@@ -415,10 +503,11 @@ export interface BlogListItem {
   title: string
   slug: string
   excerpt: string
-  coverImage: string
+  coverImage: string | null
   category: string
   readTime: number
-  publishedAt: string
+  status?: string
+  publishedAt: string | null
 }
 
 export interface BlogListResponse {
@@ -434,24 +523,6 @@ export interface BlogState {
   lastCreatedBlog: CreateBlogResponse['data'] | null
 }
 
-export interface BlogAuthorPayload {
-  name: string
-  designation: string
-}
-
-export interface CreateBlogPayload {
-  title: string
-  excerpt: string
-  content: string
-  coverImage: string
-  category: string
-  tags: string[]
-  author: BlogAuthorPayload
-  readTime: number
-  readTimeLabel: string
-  status: 'published' | 'draft'
-}
-
 export interface CreateBlogResponse {
   success: boolean
   message: string
@@ -459,8 +530,27 @@ export interface CreateBlogResponse {
     _id: string
     title: string
     slug: string
+    excerpt: string
+    content: string
+    coverImage: string | null
+    category: string
+    authorName: string
+    createdBy: string
+    readTime: number
     status: string
+    publishedAt: string | null
+    isDeleted: boolean
+    createdAt: string
+    updatedAt: string
+    __v: number
   }
+}
+
+export type UpdateBlogResponse = CreateBlogResponse
+
+export interface DeleteBlogResponse {
+  success: boolean
+  message: string
 }
 
 export interface EmergencyHelpline {

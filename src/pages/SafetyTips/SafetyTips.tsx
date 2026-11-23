@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Clock3,
   Eye,
-  FilePenLine,
   FileText,
   LoaderCircle,
   Pencil,
@@ -30,10 +29,12 @@ import {
 import type {
   BlogListItem,
   BlogListResponse,
+  DeleteBlogResponse,
   SafetyTip,
   TableColumn,
   TableRow,
 } from '../../types'
+import { hasAuthPermission } from '../../utils/auth'
 
 const columns: TableColumn[] = [
   { key: 'number', header: '#' },
@@ -46,24 +47,26 @@ const columns: TableColumn[] = [
   { key: 'actions', header: 'Actions' },
 ]
 
-const formatPublishedDate = (value: string) =>
-  new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
+const formatPublishedDate = (value: string | null) =>
+  value
+    ? new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date(value))
+    : 'Not published'
 
 const createSafetyTip = (blog: BlogListItem): SafetyTip => ({
   id: blog.id,
   slug: blog.slug,
   title: blog.title,
   description: `<p>${blog.excerpt}</p>`,
-  image: blog.coverImage,
+  image: blog.coverImage ?? '',
   readTime: blog.readTime,
   status: 'Published',
   views: 0,
   createdOn: formatPublishedDate(blog.publishedAt),
-  createdDate: blog.publishedAt.slice(0, 10),
+  createdDate: blog.publishedAt?.slice(0, 10) ?? '',
 })
 
 const SafetyTips = () => {
@@ -74,10 +77,16 @@ const SafetyTips = () => {
     isLoading,
     error,
   } = useAppSelector((state) => state.blogs)
+  const adminRole = useAppSelector((state) => state.auth.adminRole)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState('latest')
+  const [deletingBlogId, setDeletingBlogId] = useState('')
+  const [actionError, setActionError] = useState('')
   const totalBlogs = blogs.length
+  const canDeleteBlogs =
+    hasAuthPermission(adminRole, 'blogs:delete') ||
+    hasAuthPermission(adminRole, 'safety-tips:delete')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -129,15 +138,18 @@ const SafetyTips = () => {
         blog.category.toLowerCase().includes(query)
       const matchesCategory =
         categoryFilter === 'all' || blog.category === categoryFilter
-
       return matchesSearch && matchesCategory
     })
 
     return [...matchingBlogs].sort((first, second) => {
       if (sortOrder === 'oldest') {
-        return first.publishedAt.localeCompare(second.publishedAt)
+        return (first.publishedAt ?? '').localeCompare(
+          second.publishedAt ?? '',
+        )
       }
-      return second.publishedAt.localeCompare(first.publishedAt)
+      return (second.publishedAt ?? '').localeCompare(
+        first.publishedAt ?? '',
+      )
     })
   }, [blogs, categoryFilter, search, sortOrder])
 
@@ -147,9 +159,35 @@ const SafetyTips = () => {
     setSortOrder('latest')
   }
 
-  const deleteTip = (blogId: string) => {
-    if (!window.confirm('Remove this safety tip from the current list?')) return
-    dispatch(removeBlog(blogId))
+  const deleteTip = async (blogId: string) => {
+    if (!window.confirm('Are you sure you want to delete this safety tip?')) {
+      return
+    }
+
+    setDeletingBlogId(blogId)
+    setActionError('')
+
+    try {
+      const response = await axios.delete(apiUrls.deleteBlog(blogId))
+      const result = response.data as DeleteBlogResponse
+
+      if (!result.success) {
+        setActionError(result.message || 'Unable to delete safety tip.')
+        return
+      }
+
+      dispatch(removeBlog(blogId))
+    } catch (requestError: unknown) {
+      if (axios.isAxiosError(requestError)) {
+        setActionError(
+          requestError.response?.data?.message ?? requestError.message,
+        )
+      } else {
+        setActionError('Unable to delete safety tip.')
+      }
+    } finally {
+      setDeletingBlogId('')
+    }
   }
 
   const openTip = (blog: BlogListItem, mode: 'view' | 'edit') => {
@@ -163,11 +201,17 @@ const SafetyTips = () => {
       number: index + 1,
       blogId: <span className="font-medium text-text">{blog.id}</span>,
       thumbnail: (
-        <img
-          src={blog.coverImage}
-          alt={blog.title}
-          className="h-12 w-20 rounded-lg object-cover"
-        />
+        blog.coverImage ? (
+          <img
+            src={blog.coverImage}
+            alt={blog.title}
+            className="h-12 w-20 rounded-lg object-cover"
+          />
+        ) : (
+          <span className="flex h-12 w-20 items-center justify-center rounded-lg bg-primary-soft text-primary">
+            <FileText size={18} />
+          </span>
+        )
       ),
       title: (
         <span className="font-semibold text-text">{blog.title}</span>
@@ -188,7 +232,21 @@ const SafetyTips = () => {
         <div className="flex items-center gap-1">
           <button type="button" title="View safety tip" onClick={() => openTip(blog, 'view')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button>
           <button type="button" title="Edit safety tip" onClick={() => openTip(blog, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={17} /></button>
-          <button type="button" title="Remove safety tip" onClick={() => deleteTip(blog.id)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft"><Trash2 size={17} /></button>
+          {canDeleteBlogs && (
+            <button
+              type="button"
+              title="Delete safety tip"
+              disabled={deletingBlogId === blog.id}
+              onClick={() => void deleteTip(blog.id)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-accent transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {deletingBlogId === blog.id ? (
+                <LoaderCircle size={17} className="animate-spin" />
+              ) : (
+                <Trash2 size={17} />
+              )}
+            </button>
+          )}
         </div>
       ),
     },
@@ -208,7 +266,6 @@ const SafetyTips = () => {
         <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatisticCard id="total-tips" label="Total Tips" value={totalBlogs} icon={FileText} tone="accent" />
           <StatisticCard id="published-tips" label="Published" value={totalBlogs} icon={CheckCircle2} tone="green" />
-          <StatisticCard id="draft-tips" label="Drafts" value={0} icon={FilePenLine} tone="amber" />
         </div>
 
         <div className="overflow-visible rounded-xl border border-border-soft bg-white shadow-sm">
@@ -219,6 +276,7 @@ const SafetyTips = () => {
             <button type="button" title="Reset filters" onClick={resetFilters} className="h-8 rounded-md border border-primary-border bg-white px-3 text-tiny font-semibold text-primary transition-colors hover:bg-primary-hover">Reset</button>
           </div>
 
+          {actionError && <p className="m-3 rounded-lg bg-accent-soft px-3 py-2 text-tiny font-medium text-accent">{actionError}</p>}
           {error && <p className="m-3 rounded-lg bg-accent-soft px-3 py-2 text-tiny font-medium text-accent">{error}</p>}
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 px-4 py-12 text-small text-text-muted"><LoaderCircle size={18} className="animate-spin text-primary" />Loading safety tips...</div>
