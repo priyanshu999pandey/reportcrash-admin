@@ -77,6 +77,7 @@ const AccidentReportDetails = () => {
       const loadReportFromList = async () => {
         const listResponse = await axios.get(apiUrls.accidentReports, {
           signal: controller.signal,
+          params: { page: 1, limit: 10 },
         })
         const listResult = listResponse.data as AccidentReportsApiResponse
         const availableReports = listResult.data.filter(
@@ -89,7 +90,7 @@ const AccidentReportDetails = () => {
         dispatch(
           setAccidentReports({
             items: availableReports,
-            total: listResult.count,
+            pagination: listResult.pagination,
           }),
         )
 

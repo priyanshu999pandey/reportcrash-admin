@@ -169,8 +169,8 @@ export interface AccidentReportApiLocation {
 export interface AccidentReportApiReporter {
   _id: string
   email: string
-  name: string
-  phone: string
+  name?: string
+  phone?: string
 }
 
 export interface AccidentReportApiItem {
@@ -194,9 +194,15 @@ export interface AccidentReportApiItem {
 
 export interface AccidentReportsApiResponse {
   success: boolean
+  statusCode: number
   message: string
-  count: number
   data: AccidentReportApiItem[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
 }
 
 export interface AccidentReportApiResponse {
@@ -210,9 +216,18 @@ export interface DeleteAccidentReportResponse {
   message: string
 }
 
+export interface UpdateAccidentReportStatusResponse {
+  success: boolean
+  message: string
+  data?: AccidentReportApiItem
+}
+
 export interface AccidentReportsState {
   items: AccidentReportApiItem[]
   total: number
+  page: number
+  limit: number
+  totalPages: number
   selectedReport: AccidentReportApiItem | null
   isLoading: boolean
   error: string
@@ -246,6 +261,10 @@ export interface AuthPermission {
   key: string
   module: string
   name: string
+  description?: string
+  isActive?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface AuthAdminRole {
@@ -308,6 +327,20 @@ export interface RolesResponse {
   }
 }
 
+export interface PermissionsResponse {
+  success: boolean
+  statusCode?: number
+  message: string
+  data: AuthPermission[]
+}
+
+export interface PermissionModulesResponse {
+  success: boolean
+  statusCode?: number
+  message: string
+  data: string[]
+}
+
 export interface CreateRoleResponse {
   success: boolean
   message: string
@@ -319,6 +352,7 @@ export type UpdateRoleResponse = CreateRoleResponse
 export interface RolesPermissionsState {
   roles: AuthAdminRole[]
   permissions: AuthPermission[]
+  modules: string[]
   isLoading: boolean
   error: string
 }
@@ -336,7 +370,6 @@ export type PermissionModuleKey =
   | 'accidentReports'
   | 'sosAlerts'
   | 'users'
-  | 'hospitals'
   | 'safetyTips'
   | 'emergencyHelplines'
 
@@ -392,6 +425,7 @@ export interface UserProfileRow {
   name: string
   email: string
   role: UserRole
+  assignedRoleName?: string
   phone: string
   status: UserStatus
   createdOn: string
@@ -416,6 +450,59 @@ export interface UserProfileProps {
 
 export interface UsersProps {
   currentRole: AdminRole
+}
+
+export interface UserApiItem {
+  id: string
+  email: string
+  name?: string | null
+  phone?: string | null
+  profileImage: string | null
+  role: string
+  adminRole?: AuthAdminRole | null
+  isProfileComplete: boolean
+  personalInfo: {
+    dateOfBirth: string | null
+    gender: string | null
+    address: string | null
+    city: string | null
+    state: string | null
+  }
+  medicalInfo: {
+    bloodGroup: string | null
+    allergies: string[]
+    medications: string[]
+    medicalConditions: string[]
+    emergencyNotes: string | null
+  }
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UsersApiResponse {
+  success: boolean
+  statusCode: number
+  message: string
+  data: UserApiItem[]
+  pagination: {
+    totalUsers: number
+    currentPage: number
+    totalPages: number
+    limit: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }
+}
+
+export interface UsersState {
+  items: UserApiItem[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+  isLoading: boolean
+  error: string
 }
 
 export interface CreateUserProps {
@@ -449,55 +536,6 @@ export interface SafetyTipNavigationState {
 
 export interface SosAlertNavigationState {
   alert: SosAlertDetailsRow
-}
-
-export interface HospitalRow {
-  id: string
-  name: string
-  distance: number
-  distanceUnit: string
-  travelTime: number | null
-  travelMode: string
-  address: string
-  phone: string | null
-  type: string
-  isTraumaCentre: boolean | null
-  is24x7: boolean | null
-  totalBeds: number | null
-  availableBeds: number | null
-  totalICU: number | null
-  availableICU: number | null
-  latitude: number
-  longitude: number
-  navigationUrl: string
-}
-
-export interface NearbyHospitalsResponse {
-  success: boolean
-  message: string
-  searchLocation: {
-    latitude: number
-    longitude: number
-  }
-  totalHospitals: number
-  hospitals: HospitalRow[]
-  attribution: string
-}
-
-export interface HospitalState {
-  items: HospitalRow[]
-  total: number
-  searchLocation: {
-    latitude: number
-    longitude: number
-  } | null
-  attribution: string
-  isLoading: boolean
-  error: string
-}
-
-export interface HospitalNavigationState {
-  hospital: HospitalRow
 }
 
 export interface BlogListItem {

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { FileText, Hospital, LoaderCircle, Siren, Users } from "lucide-react";
+import { FileText, LoaderCircle, Siren, Users } from "lucide-react";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import Table from "../components/baseComponents/Table";
@@ -166,12 +166,13 @@ const Dashboard = () => {
       try {
         const response = await axios.get(apiUrls.accidentReports, {
           signal: controller.signal,
+          params: { page: 1, limit: 10 },
         });
         const result = response.data as AccidentReportsApiResponse;
         dispatch(
           setAccidentReports({
             items: result.data.filter((report) => !report.isDeleted),
-            total: result.count,
+            pagination: result.pagination,
           }),
         );
       } catch (requestError: unknown) {
@@ -254,7 +255,7 @@ const Dashboard = () => {
               Dashboard
             </h1>
             <p className="mt-1 mb-0 text-small text-text-muted">
-              Overview of reports, users, SOS alerts and listed hospitals.
+              Overview of reports, users and SOS alerts.
             </p>
           </div>
 
@@ -282,13 +283,6 @@ const Dashboard = () => {
             value={210}
             icon={Siren}
             tone="accent"
-          />
-          <StatisticCard
-            id="hospitals-listed"
-            label="Hospitals Listed"
-            value={128}
-            icon={Hospital}
-            tone="primary"
           />
         </div>
 

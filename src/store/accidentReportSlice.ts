@@ -7,6 +7,9 @@ import type {
 const initialState: AccidentReportsState = {
   items: [],
   total: 0,
+  page: 1,
+  limit: 10,
+  totalPages: 1,
   selectedReport: null,
   isLoading: true,
   error: '',
@@ -26,10 +29,21 @@ const accidentReportSlice = createSlice({
     },
     setAccidentReports: (
       state,
-      action: PayloadAction<{ items: AccidentReportApiItem[]; total: number }>,
+      action: PayloadAction<{
+        items: AccidentReportApiItem[]
+        pagination: {
+          total: number
+          page: number
+          limit: number
+          totalPages: number
+        }
+      }>,
     ) => {
       state.items = action.payload.items
-      state.total = action.payload.total
+      state.total = action.payload.pagination.total
+      state.page = action.payload.pagination.page
+      state.limit = action.payload.pagination.limit
+      state.totalPages = action.payload.pagination.totalPages
       state.error = ''
     },
     setAccidentReportDetailLoading: (
@@ -57,8 +71,21 @@ const accidentReportSlice = createSlice({
         (report) => report._id !== action.payload,
       )
       state.total = Math.max(0, state.total - 1)
+      state.totalPages = Math.max(1, Math.ceil(state.total / state.limit))
       if (state.selectedReport?._id === action.payload) {
         state.selectedReport = null
+      }
+    },
+    updateAccidentReportStatus: (
+      state,
+      action: PayloadAction<{ reportId: string; status: string }>,
+    ) => {
+      const report = state.items.find(
+        (item) => item._id === action.payload.reportId,
+      )
+      if (report) report.status = action.payload.status
+      if (state.selectedReport?._id === action.payload.reportId) {
+        state.selectedReport.status = action.payload.status
       }
     },
   },
@@ -72,6 +99,7 @@ export const {
   setAccidentReportsError,
   setAccidentReportsLoading,
   setSelectedAccidentReport,
+  updateAccidentReportStatus,
 } = accidentReportSlice.actions
 
 export default accidentReportSlice.reducer

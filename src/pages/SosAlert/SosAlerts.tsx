@@ -1,7 +1,8 @@
-import { ChevronLeft, ChevronRight, Clock3, Eye, Siren, UserRound } from 'lucide-react'
+import { Clock3, Eye, Siren, UserRound } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DateRangePicker from '../../components/baseComponents/DateRangePicker'
+import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
 import StatisticCard from '../../components/baseComponents/StatisticCard'
 import Table from '../../components/baseComponents/Table'
@@ -36,6 +37,8 @@ const SosAlerts = () => {
   const [search, setSearch] = useState('')
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
   const [datePickerKey, setDatePickerKey] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const alertsPerPage = 10
 
   const filteredAlerts = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -47,16 +50,22 @@ const SosAlerts = () => {
     })
   }, [dateRange, search])
 
+  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / alertsPerPage))
+  const activePage = Math.min(currentPage, totalPages)
+  const firstAlertIndex = (activePage - 1) * alertsPerPage
+  const paginatedAlerts = filteredAlerts.slice(firstAlertIndex, firstAlertIndex + alertsPerPage)
+
   const resetFilters = () => {
     setSearch('')
     setDateRange(null)
     setDatePickerKey((key) => key + 1)
+    setCurrentPage(1)
   }
 
-  const rows: TableRow[] = filteredAlerts.map((alert, index) => ({
+  const rows: TableRow[] = paginatedAlerts.map((alert, index) => ({
     key: alert.id,
     cells: {
-      number: index + 1,
+      number: firstAlertIndex + index + 1,
       sosId: <span className="font-semibold text-text">{alert.id}</span>,
       user: (
         <div className="flex items-center gap-2">
@@ -89,21 +98,14 @@ const SosAlerts = () => {
 
         <div className="overflow-visible rounded-xl border border-border-soft bg-white shadow-sm">
           <div className="grid gap-2 border-b border-border p-3 sm:grid-cols-[minmax(15rem,1fr)_auto_auto]">
-            <SearchBar value={search} placeholder="Search by SOS ID, user name or location..." onChange={setSearch} />
-            <DateRangePicker key={datePickerKey} onChange={setDateRange} />
+            <SearchBar value={search} placeholder="Search by SOS ID, user name or location..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
+            <DateRangePicker key={datePickerKey} onChange={(value) => { setDateRange(value); setCurrentPage(1) }} />
             <button type="button" title="Reset filters" onClick={resetFilters} className="flex h-8 items-center justify-center rounded-md border border-primary-border bg-white px-3 text-tiny font-semibold text-primary transition-colors hover:bg-primary-hover">Reset</button>
           </div>
 
           <Table columns={columns} rows={rows} />
 
-          <div className="flex flex-col gap-3 border-t border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-1">
-              <button type="button" title="Previous page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronLeft size={15} /></button>
-              <span className="flex h-8 min-w-8 items-center justify-center rounded-md bg-primary px-2 text-tiny font-semibold text-white">1</span>
-              <button type="button" title="Next page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronRight size={15} /></button>
-            </div>
-            <p className="m-0 text-tiny text-text-muted">Showing {filteredAlerts.length === 0 ? 0 : 1}-{filteredAlerts.length} of {filteredAlerts.length} alerts</p>
-          </div>
+          <Pagination currentPage={activePage} totalPages={totalPages} totalItems={filteredAlerts.length} pageSize={alertsPerPage} currentItemCount={paginatedAlerts.length} itemLabel="alerts" onPageChange={setCurrentPage} />
         </div>
       </div>
     </div>

@@ -16,7 +16,7 @@ import { getCreatableRoles } from '../../utils/permissions'
 
 const roleDescriptions: Record<AdminRole, string> = {
   'Super Admin': 'Full access to all modules and system settings.',
-  Admin: 'Manage reports, alerts, users and hospitals.',
+  Admin: 'Manage reports, alerts and users.',
   'Content Admin': 'Manage the Safety & Tips page.',
 }
 

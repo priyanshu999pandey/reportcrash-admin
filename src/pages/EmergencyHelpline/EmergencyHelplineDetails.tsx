@@ -22,6 +22,7 @@ import type {
   EmergencyHelplineListResponse,
   EmergencyHelplineNavigationState,
 } from '../../types'
+import { hasAuthPermission } from '../../utils/auth'
 
 const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -43,6 +44,9 @@ const EmergencyHelplineDetails = () => {
   const storedHelpline = useAppSelector((state) =>
     state.helplines.items.find((item) => item._id === helplineId),
   )
+  const adminRole = useAppSelector((state) => state.auth.adminRole)
+  const canUpdateHelplines = hasAuthPermission(adminRole, 'helplines:update')
+  const canDeleteHelplines = hasAuthPermission(adminRole, 'helplines:delete')
   const existingHelpline = navigationHelpline ?? storedHelpline
   const [helpline, setHelpline] = useState<EmergencyHelpline | null>(
     existingHelpline ?? null,
@@ -132,8 +136,8 @@ const EmergencyHelplineDetails = () => {
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button type="button" onClick={() => navigate('/emergency-helplines')} className="inline-flex items-center gap-2 text-small font-semibold text-text-muted transition-colors hover:text-primary"><ArrowLeft size={16} />Emergency Helplines <span>/</span><strong className="text-text">Helpline Details</strong></button>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="small" onClick={() => navigate(`/emergency-helplines/edit/${helpline._id}`, { state: { helpline } })} className="gap-2"><Pencil size={15} />Edit Helpline</Button>
-            <Button variant="red" size="small" disabled={isDeleting} onClick={() => void deleteHelpline()} className="gap-2">{isDeleting ? <LoaderCircle size={15} className="animate-spin" /> : <Trash2 size={15} />}{isDeleting ? 'Deleting...' : 'Delete Helpline'}</Button>
+            {canUpdateHelplines && <Button variant="outline" size="small" onClick={() => navigate(`/emergency-helplines/edit/${helpline._id}`, { state: { helpline } })} className="gap-2"><Pencil size={15} />Edit Helpline</Button>}
+            {canDeleteHelplines && <Button variant="red" size="small" disabled={isDeleting} onClick={() => void deleteHelpline()} className="gap-2">{isDeleting ? <LoaderCircle size={15} className="animate-spin" /> : <Trash2 size={15} />}{isDeleting ? 'Deleting...' : 'Delete Helpline'}</Button>}
           </div>
         </div>
 

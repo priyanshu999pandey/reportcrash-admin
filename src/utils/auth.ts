@@ -41,6 +41,29 @@ export const clearAuthSession = () => {
 export const isSuperAdminRole = (role: AuthAdminRole | null) =>
   role?.slug === 'super-admin' || role?.name.toLowerCase() === 'super admin'
 
+const permissionModuleAliases: Record<string, string> = {
+  blogs: 'safety-tips',
+  'accident-reports': 'reports',
+  accidents: 'reports',
+  sos: 'sos-alerts',
+  'emergency-helplines': 'helplines',
+  'emergency-contacts': 'helplines',
+  permissions: 'roles',
+}
+
+const permissionActionAliases: Record<string, string> = {
+  view: 'read',
+  edit: 'update',
+}
+
+const normalizePermissionKey = (permission: string) => {
+  const [moduleName, actionName] = permission.trim().toLowerCase().split(':')
+  if (!moduleName || !actionName) return permission.trim().toLowerCase()
+  const moduleKey = permissionModuleAliases[moduleName] ?? moduleName
+  const actionKey = permissionActionAliases[actionName] ?? actionName
+  return `${moduleKey}:${actionKey}`
+}
+
 export const hasAuthPermission = (
   role: AuthAdminRole | null,
   permission: string,
@@ -48,7 +71,13 @@ export const hasAuthPermission = (
   role?.isActive !== false &&
   role?.isDeleted !== true &&
   (isSuperAdminRole(role) ||
-    Boolean(role?.permissions?.some((item) => item.key === permission)))
+    Boolean(
+      role?.permissions?.some(
+        (item) =>
+          item.isActive !== false &&
+          normalizePermissionKey(item.key) === normalizePermissionKey(permission),
+      ),
+    ))
 
 export const getAuthHomeRoute = (role: AuthAdminRole | null) => {
   if (hasAuthPermission(role, 'dashboard:read')) return '/dashboard'
@@ -57,6 +86,7 @@ export const getAuthHomeRoute = (role: AuthAdminRole | null) => {
   if (hasAuthPermission(role, 'reports:read')) return '/accident-reports'
   if (hasAuthPermission(role, 'sos-alerts:read')) return '/sos-alerts'
   if (hasAuthPermission(role, 'helplines:read')) return '/emergency-helplines'
+  if (hasAuthPermission(role, 'roles:read')) return '/roles-permissions'
   return '/login'
 }
 

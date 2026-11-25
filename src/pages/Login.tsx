@@ -19,9 +19,10 @@ import Button from '../components/baseComponents/Button'
 import { apiUrls } from '../config/api'
 import { loginSuccess } from '../store/authSlice'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { setPermissions } from '../store/rolePermissionSlice'
 import type {
   AuthAdminRole,
-  RolesResponse,
+  PermissionsResponse,
   SendOtpResponse,
   VerifyOtpResponse,
 } from '../types'
@@ -103,7 +104,7 @@ const Login = () => {
         type: authenticationType,
       })
       const result = response.data as VerifyOtpResponse
-
+      
       if (!result.success || !result.data.token) {
         setError(result.message || 'OTP verification failed.')
         return
@@ -122,36 +123,40 @@ const Login = () => {
         return
       }
 
-      const rolesResponse = await axios.get(apiUrls.roles, {
-        headers: { Authorization: `Bearer ${result.data.token}` },
-        params: { page: 1, limit: 100 },
+      const permissionsResponse = await axios.get(apiUrls.permissions, {
+          headers: { Authorization: `Bearer ${result.data.token}` },
       })
-      const rolesResult = rolesResponse.data as RolesResponse
-      const matchedRole = rolesResult.data.find(
-        (role) =>
-          role._id === assignedRole._id || role.slug === assignedRole.slug,
-      )
+      const permissionsResult =
+        permissionsResponse.data as PermissionsResponse
 
-      if (!matchedRole) {
-        setError('The assigned admin role is not available.')
+      if (!permissionsResult.success) {
+        setError(permissionsResult.message || 'Unable to load permissions.')
         return
       }
 
-      if (matchedRole.isActive === false || matchedRole.isDeleted === true) {
+      const activePermissions = permissionsResult.data.filter(
+        (permission) => permission.isActive !== false,
+      )
+      dispatch(setPermissions(activePermissions))
+
+      if (
+        assignedRole.isActive === false ||
+        assignedRole.isDeleted === true
+      ) {
         setError('No active admin role is assigned to this account.')
         return
       }
 
-      const authenticatedRole: AuthAdminRole = {
-        ...matchedRole,
-        permissions: matchedRole.permissions ?? [],
+      const activeRole: AuthAdminRole = {
+        ...assignedRole,
+        permissions: activePermissions,
         isActive: true,
       }
 
       const session = {
         token: result.data.token,
         user: result.data.user,
-        adminRole: authenticatedRole,
+        adminRole: activeRole,
         isAuthenticated: true,
       }
 
@@ -163,7 +168,7 @@ const Login = () => {
           adminRole: session.adminRole,
         }),
       )
-      navigate(getAuthHomeRoute(authenticatedRole), { replace: true })
+      navigate(getAuthHomeRoute(activeRole), { replace: true })
     } catch (requestError: unknown) {
       if (axios.isAxiosError(requestError)) {
         setError(requestError.response?.data?.message ?? requestError.message)

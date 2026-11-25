@@ -152,7 +152,7 @@ const UserProfile = ({ mode = 'view', currentRole: viewerRole }: UserProfileProp
                   <div><p className="m-0 text-tiny text-text-muted">Phone Number</p><p className="mt-1 mb-0 text-small font-semibold text-text">{user.phone}</p></div>
                   <div><p className="m-0 text-tiny text-text-muted">Date of Birth</p><p className="mt-1 mb-0 text-small font-semibold text-text">{user.dateOfBirth}</p></div>
                   <div><p className="m-0 text-tiny text-text-muted">Gender</p><p className="mt-1 mb-0 text-small font-semibold text-text">{user.gender}</p></div>
-                  <div><p className="m-0 text-tiny text-text-muted">Role</p><p className="mt-1 mb-0 text-small font-semibold text-primary">{user.role}</p></div>
+                  <div><p className="m-0 text-tiny text-text-muted">Role</p><p className="mt-1 mb-0 text-small font-semibold text-primary">{user.assignedRoleName ?? user.role}</p></div>
                 </div>
               </div>
 

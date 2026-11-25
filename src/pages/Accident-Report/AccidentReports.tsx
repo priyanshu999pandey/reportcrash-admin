@@ -1,19 +1,20 @@
 import axios from 'axios'
 import {
-  ChevronLeft,
-  ChevronRight,
   CircleCheck,
   Eye,
   FileText,
   Images,
   LoaderCircle,
+  Pencil,
   Trash2,
   UserRound,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DateRangePicker from '../../components/baseComponents/DateRangePicker'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
+import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
 import StatisticCard from '../../components/baseComponents/StatisticCard'
 import Table from '../../components/baseComponents/Table'
@@ -23,6 +24,7 @@ import {
   setAccidentReports,
   setAccidentReportsError,
   setAccidentReportsLoading,
+  updateAccidentReportStatus,
 } from '../../store/accidentReportSlice'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import type {
@@ -32,6 +34,7 @@ import type {
   DeleteAccidentReportResponse,
   TableColumn,
   TableRow,
+  UpdateAccidentReportStatusResponse,
 } from '../../types'
 import { hasAuthPermission } from '../../utils/auth'
 
@@ -74,6 +77,7 @@ const AccidentReports = () => {
   const {
     items: reports,
     total: totalReports,
+    totalPages,
     isLoading,
     error,
   } = useAppSelector((state) => state.accidentReports)
@@ -86,8 +90,11 @@ const AccidentReports = () => {
   const [requestKey, setRequestKey] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [deletingReportId, setDeletingReportId] = useState('')
+  const [updatingReportId, setUpdatingReportId] = useState('')
+  const [editingReportId, setEditingReportId] = useState('')
   const [actionError, setActionError] = useState('')
   const canDeleteReports = hasAuthPermission(adminRole, 'reports:delete')
+  const canUpdateReports = hasAuthPermission(adminRole, 'reports:update')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -99,6 +106,7 @@ const AccidentReports = () => {
       try {
         const response = await axios.get(apiUrls.accidentReports, {
           signal: controller.signal,
+          params: { page: currentPage, limit: rowsPerPage },
         })
         const result = response.data as AccidentReportsApiResponse
 
@@ -114,7 +122,7 @@ const AccidentReports = () => {
         dispatch(
           setAccidentReports({
             items: result.data.filter((report) => !report.isDeleted),
-            total: result.count,
+            pagination: result.pagination,
           }),
         )
       } catch (requestError: unknown) {
@@ -137,7 +145,7 @@ const AccidentReports = () => {
 
     void loadReports()
     return () => controller.abort()
-  }, [dispatch, requestKey])
+  }, [currentPage, dispatch, requestKey])
 
   const accidentTypes = useMemo(
     () => [...new Set(reports.map((report) => report.accidentType))],
@@ -157,9 +165,9 @@ const AccidentReports = () => {
       const matchesSearch =
         !query ||
         report._id.toLowerCase().includes(query) ||
-        report.reportedBy.name.toLowerCase().includes(query) ||
+        report.reportedBy.name?.toLowerCase().includes(query) ||
         report.reportedBy.email.toLowerCase().includes(query) ||
-        report.reportedBy.phone.toLowerCase().includes(query) ||
+        report.reportedBy.phone?.toLowerCase().includes(query) ||
         location.includes(query)
       const matchesType =
         typeFilter === 'all' || report.accidentType === typeFilter
@@ -174,16 +182,9 @@ const AccidentReports = () => {
     })
   }, [dateRange, reports, search, statusFilter, typeFilter])
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredReports.length / rowsPerPage),
-  )
   const activePage = Math.min(currentPage, totalPages)
   const pageStartIndex = (activePage - 1) * rowsPerPage
-  const paginatedReports = filteredReports.slice(
-    pageStartIndex,
-    pageStartIndex + rowsPerPage,
-  )
+  const paginatedReports = filteredReports
 
   const reportedCount = reports.filter(
     (report) => report.status.toLowerCase() === 'reported',
@@ -230,6 +231,8 @@ const AccidentReports = () => {
       dispatch(removeAccidentReport(reportId))
       if (paginatedReports.length === 1 && activePage > 1) {
         setCurrentPage(activePage - 1)
+      } else {
+        setRequestKey((key) => key + 1)
       }
     } catch (requestError: unknown) {
       if (axios.isAxiosError(requestError)) {
@@ -244,6 +247,38 @@ const AccidentReports = () => {
     }
   }
 
+  const updateReportStatus = async (reportId: string, status: string) => {
+    setUpdatingReportId(reportId)
+    setActionError('')
+
+    try {
+      const response = await axios.patch(
+        apiUrls.updateAccidentReportStatus(reportId),
+        { status },
+      )
+      const result = response.data as UpdateAccidentReportStatusResponse
+
+      if (!result.success) {
+        setActionError(result.message || 'Unable to update report status.')
+        return
+      }
+
+      dispatch(updateAccidentReportStatus({
+        reportId,
+        status: result.data?.status ?? status,
+      }))
+      setEditingReportId('')
+    } catch (requestError: unknown) {
+      setActionError(
+        axios.isAxiosError(requestError)
+          ? (requestError.response?.data?.message ?? requestError.message)
+          : 'Unable to update report status.',
+      )
+    } finally {
+      setUpdatingReportId('')
+    }
+  }
+
   const tableRows: TableRow[] = paginatedReports.map((report, index) => ({
     key: report._id,
     cells: {
@@ -255,8 +290,8 @@ const AccidentReports = () => {
             <UserRound size={15} />
           </span>
           <span>
-            <span className="block font-semibold text-text">{report.reportedBy.name}</span>
-            <span className="block text-text-muted">{report.reportedBy.phone}</span>
+            <span className="block font-semibold text-text">{report.reportedBy.name ?? 'Unknown reporter'}</span>
+            <span className="block text-text-muted">{report.reportedBy.phone ?? report.reportedBy.email}</span>
           </span>
         </div>
       ),
@@ -279,7 +314,18 @@ const AccidentReports = () => {
           <span className="text-text-muted">Trapped: {formatText(report.anyoneTrapped)}</span>
         </div>
       ),
-      status: (
+      status: canUpdateReports && editingReportId === report._id ? (
+        <select
+          defaultValue=""
+          disabled={updatingReportId === report._id}
+          onChange={(event) => void updateReportStatus(report._id, event.target.value)}
+          className="h-8 rounded-md border border-border bg-white px-2 text-tiny font-semibold text-text outline-none focus:border-primary disabled:cursor-wait disabled:opacity-60"
+        >
+          <option value="" disabled>Select status</option>
+          <option value="responding">Responding</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      ) : (
         <span
           className={`inline-flex rounded-md px-2 py-1 font-semibold ${
             report.status.toLowerCase() === 'resolved'
@@ -305,6 +351,17 @@ const AccidentReports = () => {
           >
             <Eye size={18} />
           </button>
+          {canUpdateReports && (
+            editingReportId === report._id ? (
+              <button type="button" title="Cancel status edit" disabled={updatingReportId === report._id} onClick={() => setEditingReportId('')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
+                <X size={17} />
+              </button>
+            ) : (
+              <button type="button" title="Edit report status" onClick={() => setEditingReportId(report._id)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary">
+                <Pencil size={17} />
+              </button>
+            )
+          )}
           {canDeleteReports && (
             <button
               type="button"
@@ -405,49 +462,7 @@ const AccidentReports = () => {
           )}
 
           {!isLoading && !error && (
-            <div className="flex flex-col gap-3 border-t border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  title="Previous page"
-                  disabled={activePage === 1}
-                  onClick={() => setCurrentPage(activePage - 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setCurrentPage(page)}
-                      className={`flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-tiny font-semibold ${
-                        activePage === page
-                          ? 'bg-primary text-white'
-                          : 'border border-border bg-white text-text-muted'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ),
-                )}
-                <button
-                  type="button"
-                  title="Next page"
-                  disabled={activePage === totalPages}
-                  onClick={() => setCurrentPage(activePage + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <p className="m-0 text-tiny text-text-muted">
-                Showing {filteredReports.length === 0 ? 0 : pageStartIndex + 1}-
-                {Math.min(pageStartIndex + rowsPerPage, filteredReports.length)} of{' '}
-                {filteredReports.length} reports
-              </p>
-            </div>
+            <Pagination currentPage={activePage} totalPages={totalPages} totalItems={totalReports} pageSize={rowsPerPage} currentItemCount={filteredReports.length} itemLabel="reports" onPageChange={setCurrentPage} />
           )}
         </div>
       </div>

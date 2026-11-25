@@ -7,8 +7,6 @@ import Dashboard from './pages/Dashboard'
 import EmergencyHelplineDetails from './pages/EmergencyHelpline/EmergencyHelplineDetails'
 import EmergencyHelplineForm from './pages/EmergencyHelpline/EmergencyHelplineForm'
 import EmergencyHelplines from './pages/EmergencyHelpline/EmergencyHelplines'
-import HospitalDetails from './pages/Hospitals/HospitalDetails'
-import Hospitals from './pages/Hospitals/Hospitals'
 import Login from './pages/Login'
 import RolesPermissions from './pages/RolesPermissions/RolesPermissions'
 import CreateSafetyTip from './pages/SafetyTips/CreateSafetyTip'
@@ -57,11 +55,6 @@ const App = () => {
             </Route>
             <Route element={<ProtectedRoute requiredPermission="users:update" />}>
               <Route path="/users/edit/:userId" element={<UserProfile mode="edit" currentRole={currentAdminRole} />} />
-            </Route>
-
-            <Route element={<ProtectedRoute requiredPermission="hospitals:read" />}>
-              <Route path="/hospitals" element={<Hospitals />} />
-              <Route path="/hospitals/view/:hospitalId" element={<HospitalDetails />} />
             </Route>
 
             <Route element={<ProtectedRoute requiredPermission="helplines:read" />}>

@@ -1,5 +1,4 @@
 import {
-  Building2,
   FileWarning,
   LayoutDashboard,
   LogOut,
@@ -22,7 +21,6 @@ const navigationItems: NavigationItem[] = [
   { label: 'Accident Reports', path: '/accident-reports', icon: FileWarning, permission: 'reports:read' },
   { label: 'SOS Alerts', path: '/sos-alerts', icon: Siren, permission: 'sos-alerts:read' },
   { label: 'Users', path: '/users', icon: Users, permission: 'users:read' },
-  { label: 'Hospitals', path: '/hospitals', icon: Building2, permission: 'hospitals:read' },
   { label: 'Emergency Helpline', path: '/emergency-helplines', icon: PhoneCall, permission: 'helplines:read' },
   { label: 'Roles & Permissions', path: '/roles-permissions', icon: KeyRound, permission: 'roles:read' },
   { label: 'Safety & Tips', path: '/safety-tips', icon: ShieldCheck, permission: 'safety-tips:read' },

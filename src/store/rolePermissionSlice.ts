@@ -8,20 +8,9 @@ import type {
 const initialState: RolesPermissionsState = {
   roles: [],
   permissions: [],
+  modules: [],
   isLoading: true,
   error: '',
-}
-
-const getUniquePermissions = (roles: AuthAdminRole[]) => {
-  const permissionsById = new Map<string, AuthPermission>()
-
-  roles.forEach((role) => {
-    role.permissions?.forEach((permission) => {
-      permissionsById.set(permission._id, permission)
-    })
-  })
-
-  return Array.from(permissionsById.values())
 }
 
 const rolePermissionSlice = createSlice({
@@ -36,26 +25,31 @@ const rolePermissionSlice = createSlice({
     },
     setRoles: (state, action: PayloadAction<AuthAdminRole[]>) => {
       state.roles = action.payload.filter((role) => role.isDeleted !== true)
-      state.permissions = getUniquePermissions(state.roles)
       state.error = ''
+    },
+    setPermissions: (state, action: PayloadAction<AuthPermission[]>) => {
+      state.permissions = action.payload.filter(
+        (permission) => permission.isActive !== false,
+      )
+      state.error = ''
+    },
+    setPermissionModules: (state, action: PayloadAction<string[]>) => {
+      state.modules = [...new Set(action.payload.map((module) => module.trim()))]
     },
     addRole: (state, action: PayloadAction<AuthAdminRole>) => {
       state.roles = [
         ...state.roles.filter((role) => role._id !== action.payload._id),
         action.payload,
       ]
-      state.permissions = getUniquePermissions(state.roles)
     },
     updateStoredRole: (state, action: PayloadAction<AuthAdminRole>) => {
       const roleIndex = state.roles.findIndex(
         (role) => role._id === action.payload._id,
       )
       if (roleIndex >= 0) state.roles[roleIndex] = action.payload
-      state.permissions = getUniquePermissions(state.roles)
     },
     removeStoredRole: (state, action: PayloadAction<string>) => {
       state.roles = state.roles.filter((role) => role._id !== action.payload)
-      state.permissions = getUniquePermissions(state.roles)
     },
   },
 })
@@ -63,6 +57,8 @@ const rolePermissionSlice = createSlice({
 export const {
   addRole,
   removeStoredRole,
+  setPermissionModules,
+  setPermissions,
   setRoles,
   setRolesPermissionsError,
   setRolesPermissionsLoading,

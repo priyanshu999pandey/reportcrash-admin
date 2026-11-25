@@ -1,8 +1,6 @@
 import axios from 'axios'
 import {
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   Eye,
   FileText,
@@ -15,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
+import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
 import StatisticCard from '../../components/baseComponents/StatisticCard'
 import Table from '../../components/baseComponents/Table'
@@ -83,7 +82,11 @@ const SafetyTips = () => {
   const [sortOrder, setSortOrder] = useState('latest')
   const [deletingBlogId, setDeletingBlogId] = useState('')
   const [actionError, setActionError] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const tipsPerPage = 10
   const totalBlogs = blogs.length
+  const canCreateBlogs = hasAuthPermission(adminRole, 'blogs:create')
+  const canUpdateBlogs = hasAuthPermission(adminRole, 'blogs:update')
   const canDeleteBlogs =
     hasAuthPermission(adminRole, 'blogs:delete') ||
     hasAuthPermission(adminRole, 'safety-tips:delete')
@@ -153,10 +156,16 @@ const SafetyTips = () => {
     })
   }, [blogs, categoryFilter, search, sortOrder])
 
+  const totalPages = Math.max(1, Math.ceil(filteredBlogs.length / tipsPerPage))
+  const activePage = Math.min(currentPage, totalPages)
+  const firstTipIndex = (activePage - 1) * tipsPerPage
+  const paginatedBlogs = filteredBlogs.slice(firstTipIndex, firstTipIndex + tipsPerPage)
+
   const resetFilters = () => {
     setSearch('')
     setCategoryFilter('all')
     setSortOrder('latest')
+    setCurrentPage(1)
   }
 
   const deleteTip = async (blogId: string) => {
@@ -195,10 +204,10 @@ const SafetyTips = () => {
     navigate(`/safety-tips/${mode}/${blog.slug}`, { state: { tip } })
   }
 
-  const tableRows: TableRow[] = filteredBlogs.map((blog, index) => ({
+  const tableRows: TableRow[] = paginatedBlogs.map((blog, index) => ({
     key: blog.id,
     cells: {
-      number: index + 1,
+      number: firstTipIndex + index + 1,
       blogId: <span className="font-medium text-text">{blog.id}</span>,
       thumbnail: (
         blog.coverImage ? (
@@ -231,7 +240,7 @@ const SafetyTips = () => {
       actions: (
         <div className="flex items-center gap-1">
           <button type="button" title="View safety tip" onClick={() => openTip(blog, 'view')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button>
-          <button type="button" title="Edit safety tip" onClick={() => openTip(blog, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={17} /></button>
+          {canUpdateBlogs && <button type="button" title="Edit safety tip" onClick={() => openTip(blog, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={17} /></button>}
           {canDeleteBlogs && (
             <button
               type="button"
@@ -260,7 +269,7 @@ const SafetyTips = () => {
             <h1 className="m-0 text-title font-bold tracking-tight text-text">Road &amp; Safety Tips</h1>
             <p className="mt-1 mb-0 text-small text-text-muted">Manage safety and awareness tips for users.</p>
           </div>
-          <Button variant="red" size="small" onClick={() => navigate('/safety-tips/create')} className="gap-2 self-start sm:self-auto"><Plus size={16} />Create Safety Tip</Button>
+          {canCreateBlogs && <Button variant="red" size="small" onClick={() => navigate('/safety-tips/create')} className="gap-2 self-start sm:self-auto"><Plus size={16} />Create Safety Tip</Button>}
         </div>
 
         <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -270,9 +279,9 @@ const SafetyTips = () => {
 
         <div className="overflow-visible rounded-xl border border-border-soft bg-white shadow-sm">
           <div className="grid gap-2 border-b border-border p-3 sm:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_10rem_10rem_auto]">
-            <SearchBar value={search} placeholder="Search by ID, title, slug, excerpt or category..." onChange={setSearch} />
-            <FilterSelect value={categoryFilter} options={[{ label: 'All Categories', value: 'all' }, ...categories.map((category) => ({ label: category, value: category }))]} onChange={setCategoryFilter} />
-            <FilterSelect value={sortOrder} options={[{ label: 'Latest First', value: 'latest' }, { label: 'Oldest First', value: 'oldest' }]} onChange={setSortOrder} />
+            <SearchBar value={search} placeholder="Search by ID, title, slug, excerpt or category..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
+            <FilterSelect value={categoryFilter} options={[{ label: 'All Categories', value: 'all' }, ...categories.map((category) => ({ label: category, value: category }))]} onChange={(value) => { setCategoryFilter(value); setCurrentPage(1) }} />
+            <FilterSelect value={sortOrder} options={[{ label: 'Latest First', value: 'latest' }, { label: 'Oldest First', value: 'oldest' }]} onChange={(value) => { setSortOrder(value); setCurrentPage(1) }} />
             <button type="button" title="Reset filters" onClick={resetFilters} className="h-8 rounded-md border border-primary-border bg-white px-3 text-tiny font-semibold text-primary transition-colors hover:bg-primary-hover">Reset</button>
           </div>
 
@@ -284,14 +293,7 @@ const SafetyTips = () => {
             <Table columns={columns} rows={tableRows} />
           )}
 
-          <div className="flex flex-col gap-3 border-t border-border p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-1">
-              <button type="button" title="Previous page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronLeft size={15} /></button>
-              <span className="flex h-8 min-w-8 items-center justify-center rounded-md bg-primary px-2 text-tiny font-semibold text-white">1</span>
-              <button type="button" title="Next page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted"><ChevronRight size={15} /></button>
-            </div>
-            <p className="m-0 text-tiny text-text-muted">Showing {filteredBlogs.length === 0 ? 0 : 1}-{filteredBlogs.length} of {totalBlogs} tips</p>
-          </div>
+          <Pagination currentPage={activePage} totalPages={totalPages} totalItems={filteredBlogs.length} pageSize={tipsPerPage} currentItemCount={paginatedBlogs.length} itemLabel="tips" onPageChange={setCurrentPage} />
         </div>
       </div>
     </div>
