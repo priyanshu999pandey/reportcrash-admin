@@ -237,7 +237,7 @@ const SosAlerts = () => {
 
         <div className="overflow-visible rounded-xl border border-border-soft bg-white shadow-sm">
           <div className="grid gap-2 border-b border-border p-3 sm:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_10rem_auto_auto]">
-            <SearchBar value={search} placeholder="Search by SOS ID, user or location..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
+            <SearchBar value={search} placeholder="Search by user or location..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
             <FilterSelect value={statusFilter} options={[{ label: 'All Status', value: 'all' }, { label: 'Active', value: 'active' }, { label: 'Resolved', value: 'resolved' }]} onChange={(value) => { setStatusFilter(value); setCurrentPage(1) }} />
             <DateRangePicker key={datePickerKey} onChange={(value) => { setDateRange(value); setCurrentPage(1) }} />
             <button type="button" title="Reset filters" onClick={resetFilters} className="flex h-8 items-center justify-center rounded-md border border-primary-border bg-white px-3 text-tiny font-semibold text-primary transition-colors hover:bg-primary-hover">Reset</button>

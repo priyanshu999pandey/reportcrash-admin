@@ -400,7 +400,7 @@ const AccidentReports = () => {
             <div className="sm:col-span-2 xl:col-span-1">
               <SearchBar
                 value={search}
-                placeholder="Search by report ID, reporter, phone or location..."
+                placeholder="Search by reporter, phone or location..."
                 onChange={(value) => {
                   setSearch(value)
                   setCurrentPage(1)

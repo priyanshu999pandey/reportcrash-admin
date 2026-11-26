@@ -7,15 +7,16 @@ type ApiImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
 }
 
 const ApiImage = ({ src, alt = '', className = '', fallback, onError, ...props }: ApiImageProps) => {
-  const [remoteSource, setRemoteSource] = useState('')
-  const [hasError, setHasError] = useState(false)
+  const [imageState, setImageState] = useState({
+    source: '',
+    dataUrl: '',
+    hasError: false,
+  })
   const isDirectSource = Boolean(
     src?.startsWith('blob:') || src?.startsWith('data:') || src?.startsWith('/'),
   )
 
   useEffect(() => {
-    setRemoteSource('')
-    setHasError(false)
     if (!src || isDirectSource) return
     const controller = new AbortController()
 
@@ -38,10 +39,11 @@ const ApiImage = ({ src, alt = '', className = '', fallback, onError, ...props }
           reader.readAsDataURL(imageBlob)
         })
         if (controller.signal.aborted) return
-        setRemoteSource(dataUrl)
-        setHasError(false)
+        setImageState({ source: src, dataUrl, hasError: false })
       } catch (error) {
-        if ((error as Error).name !== 'AbortError') setHasError(true)
+        if ((error as Error).name !== 'AbortError') {
+          setImageState({ source: src, dataUrl: '', hasError: true })
+        }
       }
     }
 
@@ -49,7 +51,13 @@ const ApiImage = ({ src, alt = '', className = '', fallback, onError, ...props }
     return () => controller.abort()
   }, [isDirectSource, src])
 
-  const resolvedSource = isDirectSource ? src : remoteSource
+  const isCurrentSource = imageState.source === src
+  const hasError = isCurrentSource && imageState.hasError
+  const resolvedSource = isDirectSource
+    ? src
+    : isCurrentSource
+      ? imageState.dataUrl
+      : ''
 
   if (!resolvedSource || hasError) {
     return fallback ?? (
@@ -65,7 +73,7 @@ const ApiImage = ({ src, alt = '', className = '', fallback, onError, ...props }
       alt={alt}
       className={className}
       onError={(event) => {
-        setHasError(true)
+        setImageState({ source: src ?? '', dataUrl: '', hasError: true })
         onError?.(event)
       }}
       {...props}

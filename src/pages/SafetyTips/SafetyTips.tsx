@@ -38,7 +38,6 @@ import { hasAuthPermission } from '../../utils/auth'
 
 const columns: TableColumn[] = [
   { key: 'number', header: '#' },
-  { key: 'blogId', header: 'Blog ID' },
   { key: 'thumbnail', header: 'Thumbnail' },
   { key: 'title', header: 'Title' },
   { key: 'category', header: 'Category' },
@@ -208,7 +207,6 @@ const SafetyTips = () => {
     key: blog.id,
     cells: {
       number: firstTipIndex + index + 1,
-      blogId: <span className="font-medium text-text">{blog.id}</span>,
       thumbnail: (
         blog.coverImage ? (
           <ApiImage
@@ -279,7 +277,7 @@ const SafetyTips = () => {
 
         <div className="overflow-visible rounded-xl border border-border-soft bg-white shadow-sm">
           <div className="grid gap-2 border-b border-border p-3 sm:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_10rem_10rem_auto]">
-            <SearchBar value={search} placeholder="Search by ID, title, slug, excerpt or category..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
+            <SearchBar value={search} placeholder="Search by title, slug, excerpt or category..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
             <FilterSelect value={categoryFilter} options={[{ label: 'All Categories', value: 'all' }, ...categories.map((category) => ({ label: category, value: category }))]} onChange={(value) => { setCategoryFilter(value); setCurrentPage(1) }} />
             <FilterSelect value={sortOrder} options={[{ label: 'Latest First', value: 'latest' }, { label: 'Oldest First', value: 'oldest' }]} onChange={(value) => { setSortOrder(value); setCurrentPage(1) }} />
             <button type="button" title="Reset filters" onClick={resetFilters} className="h-8 rounded-md border border-primary-border bg-white px-3 text-tiny font-semibold text-primary transition-colors hover:bg-primary-hover">Reset</button>
