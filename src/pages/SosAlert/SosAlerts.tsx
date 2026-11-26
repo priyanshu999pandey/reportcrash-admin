@@ -1,87 +1,226 @@
-import { Clock3, Eye, Siren, UserRound } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import axios from 'axios'
+import { Clock3, Eye, LoaderCircle, Pencil, Siren, UserRound, Users, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DateRangePicker from '../../components/baseComponents/DateRangePicker'
+import FilterSelect from '../../components/baseComponents/FilterSelect'
 import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
 import StatisticCard from '../../components/baseComponents/StatisticCard'
 import Table from '../../components/baseComponents/Table'
-import type { DateRange, SosAlertDetailsRow, TableColumn, TableRow } from '../../types'
-
-const sosAlertsMock: SosAlertDetailsRow[] = [
-  { id: 'SOS-2026-000078', user: 'Rohit Sharma', phone: '98745 63210', email: 'rohit.sharma@example.com', location: 'Sector 24, Gurugram, India', date: '04 Nov 2026', time: '10:42 PM', dateValue: '2026-11-04', userStatus: 'Active', coordinates: '28.5037° N, 77.0888° E', message: 'Emergency assistance requested near Sector 24 main road.', emergencyContact: { name: 'Anjali Sharma', relationship: 'Sister', phone: '98745 63101' } },
-  { id: 'SOS-2026-000077', user: 'Priya Singh', phone: '98745 63211', email: 'priya.singh@example.com', location: 'NH-48, Delhi, India', date: '04 Nov 2026', time: '08:32 PM', dateValue: '2026-11-04', userStatus: 'Active', coordinates: '28.5562° N, 77.1000° E', message: 'User triggered an SOS alert while travelling on NH-48.', emergencyContact: { name: 'Raj Singh', relationship: 'Father', phone: '98745 63102' } },
-  { id: 'SOS-2026-000076', user: 'Amit Kumar', phone: '98745 63212', email: 'amit.kumar@example.com', location: 'Sector 62, Noida, India', date: '03 Nov 2026', time: '06:18 PM', dateValue: '2026-11-03', userStatus: 'Active', coordinates: '28.6270° N, 77.3723° E', message: 'Immediate help requested from the Sector 62 service road.', emergencyContact: { name: 'Nisha Kumar', relationship: 'Spouse', phone: '98745 63103' } },
-  { id: 'SOS-2026-000075', user: 'Neha Verma', phone: '98745 63213', email: 'neha.verma@example.com', location: 'Dwarka, Delhi, India', date: '02 Nov 2026', time: '02:50 PM', dateValue: '2026-11-02', userStatus: 'Inactive', coordinates: '28.5921° N, 77.0460° E', message: 'SOS alert raised close to the Dwarka metro station.', emergencyContact: { name: 'Vivek Verma', relationship: 'Brother', phone: '98745 63104' } },
-  { id: 'SOS-2026-000074', user: 'Sandeep Yadav', phone: '98745 63214', email: 'sandeep.yadav@example.com', location: 'Ghaziabad, India', date: '01 Nov 2026', time: '01:45 PM', dateValue: '2026-11-01', userStatus: 'Active', coordinates: '28.6692° N, 77.4538° E', message: 'User needs roadside emergency support in Ghaziabad.', emergencyContact: { name: 'Pooja Yadav', relationship: 'Spouse', phone: '98745 63105' } },
-  { id: 'SOS-2026-000073', user: 'Guest User', phone: '98745 63215', email: 'guest.user@example.com', location: 'Faridabad, India', date: '31 Oct 2026', time: '12:30 PM', dateValue: '2026-10-31', userStatus: 'Active', coordinates: '28.4089° N, 77.3178° E', message: 'Emergency alert received from Faridabad bypass road.', emergencyContact: { name: 'Ravi Kumar', relationship: 'Friend', phone: '98745 63106' } },
-  { id: 'SOS-2026-000072', user: 'Vikram Mehta', phone: '98745 63216', email: 'vikram.mehta@example.com', location: 'South Delhi, India', date: '30 Oct 2026', time: '11:22 AM', dateValue: '2026-10-30', userStatus: 'Active', coordinates: '28.5245° N, 77.2066° E', message: 'SOS request raised near a busy South Delhi crossing.', emergencyContact: { name: 'Sunita Mehta', relationship: 'Mother', phone: '98745 63107' } },
-  { id: 'SOS-2026-000071', user: 'Meera Patel', phone: '98745 63217', email: 'meera.patel@example.com', location: 'Rohini, Delhi, India', date: '29 Oct 2026', time: '10:15 AM', dateValue: '2026-10-29', userStatus: 'Active', coordinates: '28.7383° N, 77.0822° E', message: 'User requested emergency assistance from Rohini Sector 9.', emergencyContact: { name: 'Rajesh Patel', relationship: 'Father', phone: '98745 63108' } },
-  { id: 'SOS-2026-000070', user: 'Arjun Singh', phone: '98745 63218', email: 'arjun.singh@example.com', location: 'Noida, India', date: '28 Oct 2026', time: '09:40 AM', dateValue: '2026-10-28', userStatus: 'Inactive', coordinates: '28.5355° N, 77.3910° E', message: 'SOS alert received from the Noida expressway service lane.', emergencyContact: { name: 'Karan Singh', relationship: 'Brother', phone: '98745 63109' } },
-  { id: 'SOS-2026-000069', user: 'Simran Kaur', phone: '98745 63219', email: 'simran.kaur@example.com', location: 'Gurugram, India', date: '27 Oct 2026', time: '08:15 AM', dateValue: '2026-10-27', userStatus: 'Active', coordinates: '28.4595° N, 77.0266° E', message: 'Emergency assistance requested near central Gurugram.', emergencyContact: { name: 'Harpreet Kaur', relationship: 'Mother', phone: '98745 63110' } },
-]
+import { apiUrls } from '../../config/api'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
+import {
+  setSelectedSosAlert,
+  setSosAlerts,
+  setSosAlertsError,
+  setSosAlertsLoading,
+  updateSosAlertStatus,
+} from '../../store/sosAlertSlice'
+import type {
+  DateRange,
+  SosAlertsApiResponse,
+  TableColumn,
+  TableRow,
+  UpdateSosAlertStatusResponse,
+} from '../../types'
+import { hasAuthPermission } from '../../utils/auth'
 
 const columns: TableColumn[] = [
   { key: 'number', header: '#' },
-  { key: 'sosId', header: 'SOS ID' },
   { key: 'user', header: 'User' },
   { key: 'location', header: 'Location' },
+  { key: 'recipients', header: 'Recipients' },
+  { key: 'status', header: 'Status' },
   { key: 'triggeredAt', header: 'Triggered At' },
   { key: 'actions', header: 'Actions' },
 ]
 
-const sosStatistics = { total: 210, lastTwentyFourHours: 12 }
+const lastTwentyFourHourCutoff = Date.now() - 24 * 60 * 60 * 1000
+
+const formatTriggeredAt = (value: string) => {
+  const date = new Date(value)
+  return {
+    date: new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date),
+    time: new Intl.DateTimeFormat('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date),
+  }
+}
 
 const SosAlerts = () => {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const { items, total, totalPages, isLoading, error } = useAppSelector(
+    (state) => state.sosAlerts,
+  )
+  const adminRole = useAppSelector((state) => state.auth.adminRole)
+  const canUpdateSos = hasAuthPermission(adminRole, 'sos-alerts:update')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
   const [datePickerKey, setDatePickerKey] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
+  const [editingAlertId, setEditingAlertId] = useState('')
+  const [updatingAlertId, setUpdatingAlertId] = useState('')
+  const [actionError, setActionError] = useState('')
   const alertsPerPage = 10
 
-  const filteredAlerts = useMemo(() => {
-    const query = search.trim().toLowerCase()
+  useEffect(() => {
+    const controller = new AbortController()
 
-    return sosAlertsMock.filter((alert) => {
-      const matchesSearch = !query || alert.id.toLowerCase().includes(query) || alert.user.toLowerCase().includes(query) || alert.location.toLowerCase().includes(query)
-      const matchesDate = !dateRange || (alert.dateValue >= dateRange.startDate && alert.dateValue <= dateRange.endDate)
-      return matchesSearch && matchesDate
-    })
-  }, [dateRange, search])
+    const loadAlerts = async () => {
+      dispatch(setSosAlertsLoading(true))
+      dispatch(setSosAlertsError(''))
 
-  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / alertsPerPage))
-  const activePage = Math.min(currentPage, totalPages)
-  const firstAlertIndex = (activePage - 1) * alertsPerPage
-  const paginatedAlerts = filteredAlerts.slice(firstAlertIndex, firstAlertIndex + alertsPerPage)
+      try {
+        const response = await axios.get(apiUrls.sosAlerts, {
+          signal: controller.signal,
+          params: {
+            page: currentPage,
+            limit: alertsPerPage,
+            ...(search.trim() && { search: search.trim() }),
+            ...(statusFilter !== 'all' && { status: statusFilter }),
+            ...(dateRange && {
+              from: dateRange.startDate,
+              to: dateRange.endDate,
+            }),
+          },
+        })
+        const result = response.data as SosAlertsApiResponse
+        if (!result.success) {
+          dispatch(setSosAlertsError(result.message || 'Unable to load SOS alerts.'))
+          return
+        }
+        dispatch(setSosAlerts(result))
+      } catch (requestError: unknown) {
+        if (axios.isCancel(requestError)) return
+        dispatch(
+          setSosAlertsError(
+            axios.isAxiosError(requestError)
+              ? (requestError.response?.data?.message ?? requestError.message)
+              : 'Unable to load SOS alerts.',
+          ),
+        )
+      } finally {
+        if (!controller.signal.aborted) dispatch(setSosAlertsLoading(false))
+      }
+    }
+
+    void loadAlerts()
+    return () => controller.abort()
+  }, [currentPage, dateRange, dispatch, search, statusFilter])
+
+  const lastTwentyFourHours = useMemo(
+    () =>
+      items.filter(
+        (alert) =>
+          new Date(alert.triggeredAt).getTime() >= lastTwentyFourHourCutoff,
+      ).length,
+    [items],
+  )
 
   const resetFilters = () => {
     setSearch('')
+    setStatusFilter('all')
     setDateRange(null)
     setDatePickerKey((key) => key + 1)
     setCurrentPage(1)
   }
 
-  const rows: TableRow[] = paginatedAlerts.map((alert, index) => ({
-    key: alert.id,
-    cells: {
-      number: firstAlertIndex + index + 1,
-      sosId: <span className="font-semibold text-text">{alert.id}</span>,
-      user: (
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary"><UserRound size={16} /></span>
-          <span><span className="block font-semibold text-text">{alert.user}</span><span className="block text-tiny text-text-muted">{alert.phone}</span></span>
-        </div>
-      ),
-      location: alert.location,
-      triggeredAt: <span><span className="block">{alert.date}</span><span className="block">{alert.time}</span></span>,
-      actions: (
-        <button type="button" title="View SOS user details" onClick={() => navigate(`/sos-alerts/view/${alert.id}`, { state: { alert } })} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary">
-          <Eye size={18} />
-        </button>
-      ),
-    },
-  }))
+  const updateStatus = async (sosId: string, status: string) => {
+    setUpdatingAlertId(sosId)
+    setActionError('')
+
+    try {
+      const response = await axios.patch(apiUrls.updateSosAlertStatus(sosId), {
+        status,
+      })
+      const result = response.data as UpdateSosAlertStatusResponse
+
+      if (!result.success) {
+        setActionError(result.message || 'Unable to update SOS status.')
+        return
+      }
+
+      dispatch(
+        updateSosAlertStatus({
+          sosId,
+          status: result.data?.status ?? status,
+          updatedAt: result.data?.updatedAt,
+          statusHistory: result.data?.statusHistory,
+        }),
+      )
+      setEditingAlertId('')
+    } catch (requestError: unknown) {
+      setActionError(
+        axios.isAxiosError(requestError)
+          ? (requestError.response?.data?.message ?? requestError.message)
+          : 'Unable to update SOS status.',
+      )
+    } finally {
+      setUpdatingAlertId('')
+    }
+  }
+
+  const rows: TableRow[] = items.map((alert, index) => {
+    const triggeredAt = formatTriggeredAt(alert.triggeredAt)
+    const userName = alert.user.name?.trim() || alert.user.email.split('@')[0]
+
+    return {
+      key: alert._id,
+      cells: {
+        number: (currentPage - 1) * alertsPerPage + index + 1,
+        user: (
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary"><UserRound size={16} /></span>
+            <span><span className="block font-semibold text-text">{userName}</span><span className="block text-tiny text-text-muted">{alert.user.phone || alert.user.email}</span></span>
+          </div>
+        ),
+        location: <span className="block max-w-64">{alert.location.address || 'Not available'}</span>,
+        recipients: <span className="inline-flex items-center gap-1.5"><Users size={15} className="text-text-muted" />{alert.recipients.length}</span>,
+        status: canUpdateSos && editingAlertId === alert._id ? (
+          <select
+            defaultValue={alert.status.toLowerCase()}
+            disabled={updatingAlertId === alert._id}
+            onChange={(event) => void updateStatus(alert._id, event.target.value)}
+            className="h-8 rounded-md border border-border bg-white px-2 text-tiny font-semibold text-text outline-none focus:border-primary disabled:cursor-wait disabled:opacity-60"
+          >
+            <option value="active">Active</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        ) : <span className={`inline-flex rounded-full px-2.5 py-1 font-semibold capitalize ${alert.status.toLowerCase() === 'resolved' ? 'bg-chart-green-soft text-chart-green-dark' : 'bg-accent-soft text-accent'}`}>{alert.status}</span>,
+        triggeredAt: <span><span className="block">{triggeredAt.date}</span><span className="block text-tiny text-text-muted">{triggeredAt.time}</span></span>,
+        actions: (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              title="View SOS alert details"
+              onClick={() => {
+                dispatch(setSelectedSosAlert(alert))
+                navigate(`/sos-alerts/view/${alert._id}`, { state: { alert } })
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"
+            >
+              <Eye size={18} />
+            </button>
+            {canUpdateSos && (
+              editingAlertId === alert._id ? (
+                <button type="button" title="Cancel status edit" disabled={updatingAlertId === alert._id} onClick={() => setEditingAlertId('')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary disabled:opacity-60"><X size={17} /></button>
+              ) : (
+                <button type="button" title="Edit SOS status" onClick={() => setEditingAlertId(alert._id)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={17} /></button>
+              )
+            )}
+          </div>
+        ),
+      },
+    }
+  })
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-primary-page p-4 sm:p-5 lg:p-6">
@@ -92,20 +231,29 @@ const SosAlerts = () => {
         </div>
 
         <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatisticCard id="total-sos-alerts" label="Total SOS Alerts" value={sosStatistics.total} icon={Siren} tone="accent" />
-          <StatisticCard id="sos-last-24-hours" label="SOS in Last 24 Hours" value={sosStatistics.lastTwentyFourHours} icon={Clock3} tone="amber" />
+          <StatisticCard id="total-sos-alerts" label="Total SOS Alerts" value={total} icon={Siren} tone="accent" />
+          <StatisticCard id="sos-last-24-hours" label="SOS in Last 24 Hours" value={lastTwentyFourHours} icon={Clock3} tone="amber" />
         </div>
 
         <div className="overflow-visible rounded-xl border border-border-soft bg-white shadow-sm">
-          <div className="grid gap-2 border-b border-border p-3 sm:grid-cols-[minmax(15rem,1fr)_auto_auto]">
-            <SearchBar value={search} placeholder="Search by SOS ID, user name or location..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
+          <div className="grid gap-2 border-b border-border p-3 sm:grid-cols-2 xl:grid-cols-[minmax(15rem,1fr)_10rem_auto_auto]">
+            <SearchBar value={search} placeholder="Search by SOS ID, user or location..." onChange={(value) => { setSearch(value); setCurrentPage(1) }} />
+            <FilterSelect value={statusFilter} options={[{ label: 'All Status', value: 'all' }, { label: 'Active', value: 'active' }, { label: 'Resolved', value: 'resolved' }]} onChange={(value) => { setStatusFilter(value); setCurrentPage(1) }} />
             <DateRangePicker key={datePickerKey} onChange={(value) => { setDateRange(value); setCurrentPage(1) }} />
             <button type="button" title="Reset filters" onClick={resetFilters} className="flex h-8 items-center justify-center rounded-md border border-primary-border bg-white px-3 text-tiny font-semibold text-primary transition-colors hover:bg-primary-hover">Reset</button>
           </div>
 
-          <Table columns={columns} rows={rows} />
+          {actionError && <p className="m-3 rounded-lg bg-accent-soft px-3 py-2 text-tiny font-medium text-accent">{actionError}</p>}
 
-          <Pagination currentPage={activePage} totalPages={totalPages} totalItems={filteredAlerts.length} pageSize={alertsPerPage} currentItemCount={paginatedAlerts.length} itemLabel="alerts" onPageChange={setCurrentPage} />
+          {isLoading ? (
+            <div className="flex min-h-48 items-center justify-center gap-2 text-small text-text-muted"><LoaderCircle size={18} className="animate-spin text-primary" />Loading SOS alerts...</div>
+          ) : error ? (
+            <div className="flex min-h-48 items-center justify-center px-4 text-small font-medium text-accent">{error}</div>
+          ) : (
+            <Table columns={columns} rows={rows} />
+          )}
+
+          {!isLoading && !error && <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={total} pageSize={alertsPerPage} currentItemCount={items.length} itemLabel="alerts" onPageChange={setCurrentPage} />}
         </div>
       </div>
     </div>

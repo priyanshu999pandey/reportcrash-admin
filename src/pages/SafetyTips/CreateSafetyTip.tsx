@@ -16,6 +16,7 @@ import {
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
+import ApiImage from '../../components/baseComponents/ApiImage'
 import { apiUrls } from '../../config/api'
 import {
   setLastCreatedBlog,
@@ -334,7 +335,7 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
                 className="hidden"
               />
               {imagePreview ? (
-                <img
+                <ApiImage
                   src={imagePreview}
                   alt={title || 'Featured safety tip'}
                   className="h-36 w-full max-w-md rounded-lg object-cover"

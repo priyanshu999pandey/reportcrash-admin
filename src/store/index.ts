@@ -5,6 +5,7 @@ import authReducer from './authSlice'
 import accidentReportReducer from './accidentReportSlice'
 import rolePermissionReducer from './rolePermissionSlice'
 import userReducer from './userSlice'
+import sosAlertReducer from './sosAlertSlice'
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     accidentReports: accidentReportReducer,
     rolesPermissions: rolePermissionReducer,
     users: userReducer,
+    sosAlerts: sosAlertReducer,
   },
 })
 

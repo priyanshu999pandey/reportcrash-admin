@@ -35,10 +35,16 @@ const userSlice = createSlice({
       )
       if (userIndex >= 0) state.items[userIndex] = action.payload
     },
+    removeStoredUser: (state, action: PayloadAction<string>) => {
+      state.items = state.items.filter((user) => user.id !== action.payload)
+      state.total = Math.max(0, state.total - 1)
+      state.totalPages = Math.max(1, Math.ceil(state.total / state.limit))
+    },
   },
 })
 
 export const {
+  removeStoredUser,
   setUsers,
   setUsersError,
   setUsersLoading,

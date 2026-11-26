@@ -235,6 +235,15 @@ export interface AccidentReportsState {
   detailError: string
 }
 
+export interface SosAlertUser {
+  _id: string
+  email: string
+  role: string
+  isActive: boolean
+  name?: string
+  phone?: string
+}
+
 export type SosAlertRow = {
   id: string
   user: string
@@ -243,14 +252,89 @@ export type SosAlertRow = {
   time: string
 }
 
-export interface SosAlertDetailsRow extends SosAlertRow {
-  phone: string
-  email: string
-  dateValue: string
-  userStatus: UserStatus
-  coordinates: string
+export interface SosAlertRecipient {
+  emergencyContact: string
+  name: string
+  phoneNumber: string
+  priority: number
+  notifyBySms: boolean
+  status: string
+  provider: string
+  providerMessageId: string | null
+  error: string | null
+  attemptedAt: string
+}
+
+export interface SosAlertLocation {
+  latitude: number
+  longitude: number
+  address: string
+}
+
+export interface SosStatusHistoryItem {
+  status: string
+  changedBy: string
+  changedAt: string
+}
+
+export interface SosAlertApiItem {
+  _id: string
+  user: SosAlertUser
+  recipients: SosAlertRecipient[]
+  recipientType: string
+  location: SosAlertLocation
   message: string
-  emergencyContact: EmergencyContact
+  status: string
+  triggeredAt: string
+  statusHistory: SosStatusHistoryItem[]
+  createdAt: string
+  updatedAt: string
+  __v: number
+}
+
+export interface SosAlertsApiResponse {
+  success: boolean
+  statusCode: number
+  message: string
+  data: SosAlertApiItem[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+
+export interface SosAlertApiResponse {
+  success: boolean
+  statusCode: number
+  message: string
+  data: SosAlertApiItem
+}
+
+export interface UpdateSosAlertStatusResponse {
+  success: boolean
+  statusCode: number
+  message: string
+  data?: {
+    _id: string
+    status: string
+    updatedAt?: string
+    statusHistory?: SosStatusHistoryItem[]
+  }
+}
+
+export interface SosAlertsState {
+  items: SosAlertApiItem[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+  selectedAlert: SosAlertApiItem | null
+  isLoading: boolean
+  error: string
+  isDetailLoading: boolean
+  detailError: string
 }
 
 export type AdminRole = 'Super Admin' | 'Admin' | 'Content Admin'
@@ -426,15 +510,21 @@ export interface UserProfileRow {
   email: string
   role: UserRole
   assignedRoleName?: string
+  profileImage?: string | null
   phone: string
   status: UserStatus
   createdOn: string
   createdDate: string
   dateOfBirth: string
   gender: string
+  address?: string
+  city?: string
+  state?: string
   bloodGroup: string
   allergies: readonly string[]
+  medications?: readonly string[]
   medicalConditions: readonly string[]
+  emergencyNotes?: string
   emergencyContact: EmergencyContact
   totalReports: number
 }
@@ -495,6 +585,26 @@ export interface UsersApiResponse {
   }
 }
 
+export interface UserApiResponse {
+  success: boolean
+  statusCode: number
+  message: string
+  data: UserApiItem
+}
+
+export interface DeleteUserResponse {
+  success: boolean
+  statusCode?: number
+  message: string
+}
+
+export interface UpdateAssignedUserRoleResponse {
+  success: boolean
+  statusCode?: number
+  message: string
+  data?: UserApiItem
+}
+
 export interface UsersState {
   items: UserApiItem[]
   total: number
@@ -535,7 +645,7 @@ export interface SafetyTipNavigationState {
 }
 
 export interface SosAlertNavigationState {
-  alert: SosAlertDetailsRow
+  alert: SosAlertApiItem
 }
 
 export interface BlogListItem {
@@ -545,19 +655,33 @@ export interface BlogListItem {
   excerpt: string
   coverImage: string | null
   category: string
+  tags?: string[]
+  author?: string
   readTime: number
+  readTimeLabel?: string
   status?: string
   publishedAt: string | null
 }
 
 export interface BlogListResponse {
   success: boolean
+  statusCode?: number
   message: string
   data: BlogListItem[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
 }
 
 export interface BlogState {
   items: BlogListItem[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
   isLoading: boolean
   error: string
   lastCreatedBlog: CreateBlogResponse['data'] | null

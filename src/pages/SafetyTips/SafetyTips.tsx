@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
+import ApiImage from '../../components/baseComponents/ApiImage'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
 import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
@@ -73,6 +74,8 @@ const SafetyTips = () => {
   const dispatch = useAppDispatch()
   const {
     items: blogs,
+    total: totalBlogs,
+    totalPages: serverTotalPages,
     isLoading,
     error,
   } = useAppSelector((state) => state.blogs)
@@ -84,7 +87,6 @@ const SafetyTips = () => {
   const [actionError, setActionError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const tipsPerPage = 10
-  const totalBlogs = blogs.length
   const canCreateBlogs = hasAuthPermission(adminRole, 'blogs:create')
   const canUpdateBlogs = hasAuthPermission(adminRole, 'blogs:update')
   const canDeleteBlogs =
@@ -99,9 +101,19 @@ const SafetyTips = () => {
       dispatch(setBlogError(''))
 
       try {
-        const response = await axios.get(apiUrls.blogs, { signal: controller.signal })
+        const response = await axios.get(apiUrls.blogs, {
+          signal: controller.signal,
+          params: {
+            page: currentPage,
+            limit: tipsPerPage,
+            ...(search.trim() ? { search: search.trim() } : {}),
+            ...(categoryFilter !== 'all'
+              ? { category: categoryFilter }
+              : {}),
+          },
+        })
         const result = response.data as BlogListResponse
-        dispatch(setBlogs(result.data))
+        dispatch(setBlogs(result))
       } catch (requestError: unknown) {
         if (axios.isCancel(requestError)) return
         if (axios.isAxiosError(requestError)) {
@@ -122,29 +134,15 @@ const SafetyTips = () => {
 
     void loadBlogs()
     return () => controller.abort()
-  }, [dispatch])
+  }, [categoryFilter, currentPage, dispatch, search])
 
   const categories = useMemo(
     () => [...new Set(blogs.map((blog) => blog.category))],
     [blogs],
   )
 
-  const filteredBlogs = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    const matchingBlogs = blogs.filter((blog) => {
-      const matchesSearch =
-        !query ||
-        blog.id.toLowerCase().includes(query) ||
-        blog.title.toLowerCase().includes(query) ||
-        blog.slug.toLowerCase().includes(query) ||
-        blog.excerpt.toLowerCase().includes(query) ||
-        blog.category.toLowerCase().includes(query)
-      const matchesCategory =
-        categoryFilter === 'all' || blog.category === categoryFilter
-      return matchesSearch && matchesCategory
-    })
-
-    return [...matchingBlogs].sort((first, second) => {
+  const displayedBlogs = useMemo(() => {
+    return [...blogs].sort((first, second) => {
       if (sortOrder === 'oldest') {
         return (first.publishedAt ?? '').localeCompare(
           second.publishedAt ?? '',
@@ -154,12 +152,11 @@ const SafetyTips = () => {
         first.publishedAt ?? '',
       )
     })
-  }, [blogs, categoryFilter, search, sortOrder])
+  }, [blogs, sortOrder])
 
-  const totalPages = Math.max(1, Math.ceil(filteredBlogs.length / tipsPerPage))
+  const totalPages = Math.max(1, serverTotalPages)
   const activePage = Math.min(currentPage, totalPages)
   const firstTipIndex = (activePage - 1) * tipsPerPage
-  const paginatedBlogs = filteredBlogs.slice(firstTipIndex, firstTipIndex + tipsPerPage)
 
   const resetFilters = () => {
     setSearch('')
@@ -186,6 +183,9 @@ const SafetyTips = () => {
       }
 
       dispatch(removeBlog(blogId))
+      if (blogs.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => page - 1)
+      }
     } catch (requestError: unknown) {
       if (axios.isAxiosError(requestError)) {
         setActionError(
@@ -204,14 +204,14 @@ const SafetyTips = () => {
     navigate(`/safety-tips/${mode}/${blog.slug}`, { state: { tip } })
   }
 
-  const tableRows: TableRow[] = paginatedBlogs.map((blog, index) => ({
+  const tableRows: TableRow[] = displayedBlogs.map((blog, index) => ({
     key: blog.id,
     cells: {
       number: firstTipIndex + index + 1,
       blogId: <span className="font-medium text-text">{blog.id}</span>,
       thumbnail: (
         blog.coverImage ? (
-          <img
+          <ApiImage
             src={blog.coverImage}
             alt={blog.title}
             className="h-12 w-20 rounded-lg object-cover"
@@ -293,7 +293,7 @@ const SafetyTips = () => {
             <Table columns={columns} rows={tableRows} />
           )}
 
-          <Pagination currentPage={activePage} totalPages={totalPages} totalItems={filteredBlogs.length} pageSize={tipsPerPage} currentItemCount={paginatedBlogs.length} itemLabel="tips" onPageChange={setCurrentPage} />
+          <Pagination currentPage={activePage} totalPages={totalPages} totalItems={totalBlogs} pageSize={tipsPerPage} currentItemCount={displayedBlogs.length} itemLabel="tips" onPageChange={setCurrentPage} />
         </div>
       </div>
     </div>

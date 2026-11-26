@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
+import ApiImage from '../../components/baseComponents/ApiImage'
 import { apiUrls } from '../../config/api'
 import {
   setAccidentReportDetailError,
@@ -232,7 +233,7 @@ const AccidentReportDetails = () => {
                           {report.photos.map((photo, index) =>
                             isWebUrl(photo) ? (
                               <a key={`${photo}-${index}`} href={photo} target="_blank" rel="noreferrer" className="overflow-hidden rounded-lg border border-border bg-primary-page">
-                                <img src={photo} alt={`Accident evidence ${index + 1}`} className="h-40 w-full object-cover" />
+                                <ApiImage src={photo} alt={`Accident evidence ${index + 1}`} className="h-40 w-full object-cover" />
                                 <span className="flex items-center justify-between gap-2 px-3 py-2 text-tiny font-medium text-text">Photo {index + 1}<ExternalLink size={13} /></span>
                               </a>
                             ) : (

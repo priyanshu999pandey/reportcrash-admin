@@ -28,6 +28,11 @@ const AccidentReportsTrend = ({
       60: sixtyDaysData,
     }[trendPeriod],
   ]
+  const highestReportCount = Math.max(
+    1,
+    ...trendData.map((point) => point.reports),
+  )
+  const yAxisMaximum = Math.max(5, Math.ceil(highestReportCount / 5) * 5)
 
   return (
     <div className="min-w-0 rounded-xl border border-border-soft bg-white p-4 shadow-sm">
@@ -66,8 +71,8 @@ const AccidentReportsTrend = ({
               interval="preserveStartEnd"
             />
             <YAxis
-              domain={[0, 100]}
-              ticks={[0, 20, 40, 60, 80, 100]}
+              domain={[0, yAxisMaximum]}
+              allowDecimals={false}
               axisLine={false}
               tickLine={false}
               tick={{ fill: 'var(--color-text-muted)', fontSize: 'var(--text-tiny)' }}

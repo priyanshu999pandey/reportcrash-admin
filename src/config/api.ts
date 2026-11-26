@@ -30,6 +30,10 @@ export const apiUrls = {
   sendOtp: `${apiBaseUrl}/auth/send-otp`,
   verifyOtp: `${apiBaseUrl}/auth/verify-otp`,
   users: `${apiBaseUrl}/user`,
+  userById: (userId: string) => `${apiBaseUrl}/user/${userId}`,
+  deleteUser: (userId: string) => `${apiBaseUrl}/user/${userId}`,
+  updateAssignedUserRole: (userId: string) =>
+    `${apiBaseUrl}/user/${userId}/role`,
   roles: `${apiBaseUrl}/role`,
   permissions: `${apiBaseUrl}/permission`,
   permissionModules: `${apiBaseUrl}/permission/modules`,
@@ -46,4 +50,8 @@ export const apiUrls = {
   blogById: (blogId: string) => `${apiBaseUrl}/blogs/${blogId}`,
   deleteBlog: (blogId: string) => `${apiBaseUrl}/blogs/${blogId}`,
   helplines: `${apiBaseUrl}/helpline/`,
+  sosAlerts: `${apiBaseUrl}/admin/sos`,
+  sosAlertById: (sosId: string) => `${apiBaseUrl}/admin/sos/${sosId}`,
+  updateSosAlertStatus: (sosId: string) =>
+    `${apiBaseUrl}/admin/sos/${sosId}/status`,
 }

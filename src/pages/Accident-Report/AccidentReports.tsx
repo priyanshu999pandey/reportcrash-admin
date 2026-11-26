@@ -59,7 +59,6 @@ const formatDateTime = (value: string) =>
 
 const columns: TableColumn[] = [
   { key: 'number', header: '#' },
-  { key: 'reportId', header: 'Report ID' },
   { key: 'reporter', header: 'Reporter' },
   { key: 'accidentType', header: 'Accident Type' },
   { key: 'location', header: 'Location' },
@@ -283,7 +282,6 @@ const AccidentReports = () => {
     key: report._id,
     cells: {
       number: pageStartIndex + index + 1,
-      reportId: <span className="font-semibold text-text">{report._id}</span>,
       reporter: (
         <div className="flex items-center gap-2 whitespace-nowrap">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
