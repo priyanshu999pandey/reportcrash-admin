@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type SubmitEventHandler } from 'react'
 import Button from '../../components/baseComponents/Button'
+import DeleteConfirmationModal from '../../components/baseComponents/DeleteConfirmationModal'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
 import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
@@ -126,6 +127,26 @@ const backendPermissionKeys: Partial<
   },
 }
 
+const pairedPermissionKeys: Partial<
+  Record<PermissionModuleKey, Partial<Record<PermissionAction, string>>>
+> = {
+  safetyTips: {
+    view: 'blogs:read',
+    create: 'blogs:create',
+    edit: 'blogs:update',
+    delete: 'blogs:delete',
+  },
+}
+
+const getBackendPermissionKeys = (
+  moduleKey: PermissionModuleKey,
+  action: PermissionAction,
+) =>
+  [
+    backendPermissionKeys[moduleKey]?.[action],
+    pairedPermissionKeys[moduleKey]?.[action],
+  ].filter((key): key is string => Boolean(key))
+
 const mapRolePermissions = (role: AuthAdminRole) => {
   const mappedPermissions = copyPermissions(emptyPermissions)
 
@@ -179,6 +200,8 @@ const RolesPermissions = () => {
   const [permissions, setPermissions] = useState<RolePermissionSelection>(copyPermissions(emptyPermissions))
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [deletingRoleId, setDeletingRoleId] = useState('')
+  const [rolePendingDelete, setRolePendingDelete] = useState<RoleManagementItem | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const rolesPerPage = 10
 
@@ -186,16 +209,10 @@ const RolesPermissions = () => {
   const permissionIdsByKey = useMemo(
     () =>
       Object.fromEntries(
-        storedPermissions.flatMap((permission) => {
-          const entries = [[permission.key, permission._id]]
-          if (permission.key.startsWith('blogs:')) {
-            entries.push([
-              permission.key.replace('blogs:', 'safety-tips:'),
-              permission._id,
-            ])
-          }
-          return entries
-        }),
+        storedPermissions.map((permission) => [
+          permission.key,
+          permission._id,
+        ]),
       ),
     [storedPermissions],
   )
@@ -274,10 +291,25 @@ const RolesPermissions = () => {
     setError('')
   }
 
-  const deleteRole = (role: RoleManagementItem) => {
-    if (role.name === 'Super Admin' || !window.confirm(`Delete ${role.name}?`)) return
-    dispatch(removeStoredRole(role.id))
-    if (selectedRoleId === role.id) resetForm()
+  const deleteRole = async (role: RoleManagementItem) => {
+    if (role.name === 'Super Admin') return
+
+    try {
+      setDeletingRoleId(role.id)
+      dispatch(setRolesPermissionsError(''))
+      await axios.delete(apiUrls.deleteRole(role.id))
+      dispatch(removeStoredRole(role.id))
+      if (selectedRoleId === role.id) resetForm()
+    } catch (requestError: unknown) {
+      dispatch(setRolesPermissionsError(
+        axios.isAxiosError(requestError)
+          ? (requestError.response?.data?.message ?? requestError.message)
+          : 'Unable to delete role.',
+      ))
+    } finally {
+      setDeletingRoleId('')
+      setRolePendingDelete(null)
+    }
   }
 
   const togglePermission = (moduleKey: PermissionModuleKey, action: PermissionAction) => {
@@ -312,11 +344,15 @@ const RolesPermissions = () => {
       return
     }
 
-    const selectedPermissionKeys = permissionModules.flatMap((module) =>
-      permissions[module.key]
-        .map((action) => backendPermissionKeys[module.key]?.[action])
-        .filter((key): key is string => Boolean(key)),
-    )
+    const selectedPermissionKeys = [
+      ...new Set(
+        permissionModules.flatMap((module) =>
+          permissions[module.key].flatMap((action) =>
+            getBackendPermissionKeys(module.key, action),
+          ),
+        ),
+      ),
+    ]
     const missingPermission = selectedPermissionKeys.find(
       (key) => !permissionIdsByKey[key],
     )
@@ -380,11 +416,11 @@ const RolesPermissions = () => {
     key: role.id,
     cells: {
       number: firstRoleIndex + index + 1,
-      role: <div><span className="block font-semibold text-text">{role.name}</span><span className="mt-1 block max-w-52 text-tiny leading-5 text-text-muted">{role.description}</span></div>,
+      role: <span className="font-semibold text-text">{role.name}</span>,
       permissions: role.permissionCount,
       status: <span className="inline-flex items-center gap-1.5 rounded-full bg-chart-green-soft px-2.5 py-1 font-semibold text-chart-green-dark"><span className="h-1.5 w-1.5 rounded-full bg-chart-green-dark" />{role.status}</span>,
       createdOn: role.createdOn,
-      actions: <div className="flex items-center gap-1"><button type="button" title="View role" onClick={() => openRole(role, 'view')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button>{canUpdateRoles && <button type="button" title="Edit role" onClick={() => openRole(role, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={16} /></button>}{canDeleteRoles && <button type="button" title="Delete role" disabled={role.name === 'Super Admin'} onClick={() => deleteRole(role)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={16} /></button>}</div>,
+      actions: <div className="flex items-center gap-1"><button type="button" title="View role" onClick={() => openRole(role, 'view')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button>{canUpdateRoles && <button type="button" title="Edit role" onClick={() => openRole(role, 'edit')} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={16} /></button>}{canDeleteRoles && <button type="button" title="Delete role" disabled={role.name === 'Super Admin' || deletingRoleId === role.id} onClick={() => setRolePendingDelete(role)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-35">{deletingRoleId === role.id ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}</button>}</div>,
     },
   }))
 
@@ -423,7 +459,7 @@ const RolesPermissions = () => {
               <div className="space-y-2">
                 {permissionModules.map((module) => {
                   const Icon = module.icon
-                  return <div key={module.key} className="grid gap-2 rounded-lg border border-border-soft p-2 sm:grid-cols-[minmax(9rem,1fr)_auto] sm:items-center"><div className="flex min-w-0 items-start gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={15} /></span><div className="min-w-0"><p className="m-0 text-tiny font-bold text-text">{module.label}</p><p className="mt-0.5 mb-0 text-tiny leading-4 text-text-muted">{module.description}</p></div></div><div className="flex flex-wrap gap-x-2 gap-y-1 sm:justify-end">{module.actions.map((action) => { const permissionKey = backendPermissionKeys[module.key]?.[action]; const isUnavailable = formMode === 'create' && (!permissionKey || !permissionIdsByKey[permissionKey]); return <label key={action} className={`inline-flex items-center gap-1 text-tiny font-medium text-text ${isViewMode || !canSubmitRole || isUnavailable ? 'cursor-default opacity-50' : 'cursor-pointer'}`}><input type="checkbox" checked={permissions[module.key].includes(action)} disabled={isViewMode || !canSubmitRole || isUnavailable} onChange={() => togglePermission(module.key, action)} className="h-4 w-4 accent-primary" />{actionLabels[action]}</label> })}</div></div>
+                  return <div key={module.key} className="grid gap-2 rounded-lg border border-border-soft p-2 sm:grid-cols-[minmax(9rem,1fr)_auto] sm:items-center"><div className="flex min-w-0 items-start gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={15} /></span><div className="min-w-0"><p className="m-0 text-tiny font-bold text-text">{module.label}</p><p className="mt-0.5 mb-0 text-tiny leading-4 text-text-muted">{module.description}</p></div></div><div className="flex flex-wrap gap-x-2 gap-y-1 sm:justify-end">{module.actions.map((action) => { const permissionKeys = getBackendPermissionKeys(module.key, action); const isUnavailable = formMode === 'create' && (permissionKeys.length === 0 || permissionKeys.some((key) => !permissionIdsByKey[key])); return <label key={action} className={`inline-flex items-center gap-1 text-tiny font-medium text-text ${isViewMode || !canSubmitRole || isUnavailable ? 'cursor-default opacity-50' : 'cursor-pointer'}`}><input type="checkbox" checked={permissions[module.key].includes(action)} disabled={isViewMode || !canSubmitRole || isUnavailable} onChange={() => togglePermission(module.key, action)} className="h-4 w-4 accent-primary" />{actionLabels[action]}</label> })}</div></div>
                 })}
               </div>
             </div>
@@ -432,6 +468,16 @@ const RolesPermissions = () => {
           <div className="flex justify-end gap-2 border-t border-border p-3"><Button variant="outline" size="small" onClick={resetForm}>{isViewMode ? 'Close' : 'Cancel'}</Button>{!isViewMode && canSubmitRole && <Button type="submit" variant="red" size="small" disabled={isSubmitting} className="gap-2">{isSubmitting && <LoaderCircle size={15} className="animate-spin" />}{isSubmitting ? formMode === 'edit' ? 'Updating...' : 'Creating...' : formMode === 'edit' ? 'Save Changes' : 'Create Role'}</Button>}</div>
         </form>
       </div>
+      <DeleteConfirmationModal
+        isOpen={Boolean(rolePendingDelete)}
+        title="Delete role?"
+        message={rolePendingDelete ? `${rolePendingDelete.name} will be permanently removed. Admins assigned to this role may lose their access.` : ''}
+        isDeleting={deletingRoleId === rolePendingDelete?.id}
+        onCancel={() => setRolePendingDelete(null)}
+        onConfirm={() => {
+          if (rolePendingDelete) void deleteRole(rolePendingDelete)
+        }}
+      />
     </div>
   )
 }

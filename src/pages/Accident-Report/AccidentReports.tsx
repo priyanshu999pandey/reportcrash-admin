@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import DeleteConfirmationModal from '../../components/baseComponents/DeleteConfirmationModal'
 import DateRangePicker from '../../components/baseComponents/DateRangePicker'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
 import Pagination from '../../components/baseComponents/Pagination'
@@ -61,7 +62,6 @@ const columns: TableColumn[] = [
   { key: 'number', header: '#' },
   { key: 'reporter', header: 'Reporter' },
   { key: 'accidentType', header: 'Accident Type' },
-  { key: 'location', header: 'Location' },
   { key: 'injury', header: 'Injury / Trapped' },
   { key: 'status', header: 'Status' },
   { key: 'reportedAt', header: 'Reported At' },
@@ -89,6 +89,7 @@ const AccidentReports = () => {
   const [requestKey, setRequestKey] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [deletingReportId, setDeletingReportId] = useState('')
+  const [reportPendingDeleteId, setReportPendingDeleteId] = useState('')
   const [updatingReportId, setUpdatingReportId] = useState('')
   const [editingReportId, setEditingReportId] = useState('')
   const [actionError, setActionError] = useState('')
@@ -208,11 +209,6 @@ const AccidentReports = () => {
   }
 
   const deleteReport = async (reportId: string) => {
-    const shouldDelete = window.confirm(
-      'Are you sure you want to delete this accident report?',
-    )
-    if (!shouldDelete) return
-
     setDeletingReportId(reportId)
     setActionError('')
 
@@ -243,6 +239,7 @@ const AccidentReports = () => {
       }
     } finally {
       setDeletingReportId('')
+      setReportPendingDeleteId('')
     }
   }
 
@@ -294,7 +291,6 @@ const AccidentReports = () => {
         </div>
       ),
       accidentType: formatText(report.accidentType),
-      location: <span className="block max-w-60 whitespace-normal">{formatLocation(report)}</span>,
       injury: (
         <div className="flex flex-col items-start gap-1">
           <span
@@ -365,7 +361,7 @@ const AccidentReports = () => {
               type="button"
               title="Delete report"
               disabled={deletingReportId === report._id}
-              onClick={() => void deleteReport(report._id)}
+              onClick={() => setReportPendingDeleteId(report._id)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-accent transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
             >
               {deletingReportId === report._id ? (
@@ -464,6 +460,14 @@ const AccidentReports = () => {
           )}
         </div>
       </div>
+      <DeleteConfirmationModal
+        isOpen={Boolean(reportPendingDeleteId)}
+        title="Delete accident report?"
+        message="This accident report will be permanently removed. This action cannot be undone."
+        isDeleting={deletingReportId === reportPendingDeleteId}
+        onCancel={() => setReportPendingDeleteId('')}
+        onConfirm={() => void deleteReport(reportPendingDeleteId)}
+      />
     </div>
   )
 }

@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
 import ApiImage from '../../components/baseComponents/ApiImage'
+import DeleteConfirmationModal from '../../components/baseComponents/DeleteConfirmationModal'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
 import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
@@ -83,6 +84,7 @@ const SafetyTips = () => {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState('latest')
   const [deletingBlogId, setDeletingBlogId] = useState('')
+  const [tipPendingDeleteId, setTipPendingDeleteId] = useState('')
   const [actionError, setActionError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const tipsPerPage = 10
@@ -165,10 +167,6 @@ const SafetyTips = () => {
   }
 
   const deleteTip = async (blogId: string) => {
-    if (!window.confirm('Are you sure you want to delete this safety tip?')) {
-      return
-    }
-
     setDeletingBlogId(blogId)
     setActionError('')
 
@@ -195,6 +193,7 @@ const SafetyTips = () => {
       }
     } finally {
       setDeletingBlogId('')
+      setTipPendingDeleteId('')
     }
   }
 
@@ -244,7 +243,7 @@ const SafetyTips = () => {
               type="button"
               title="Delete safety tip"
               disabled={deletingBlogId === blog.id}
-              onClick={() => void deleteTip(blog.id)}
+              onClick={() => setTipPendingDeleteId(blog.id)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-accent transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
             >
               {deletingBlogId === blog.id ? (
@@ -294,6 +293,14 @@ const SafetyTips = () => {
           <Pagination currentPage={activePage} totalPages={totalPages} totalItems={totalBlogs} pageSize={tipsPerPage} currentItemCount={displayedBlogs.length} itemLabel="tips" onPageChange={setCurrentPage} />
         </div>
       </div>
+      <DeleteConfirmationModal
+        isOpen={Boolean(tipPendingDeleteId)}
+        title="Delete safety tip?"
+        message="This safety tip will be permanently removed. This action cannot be undone."
+        isDeleting={deletingBlogId === tipPendingDeleteId}
+        onCancel={() => setTipPendingDeleteId('')}
+        onConfirm={() => void deleteTip(tipPendingDeleteId)}
+      />
     </div>
   )
 }

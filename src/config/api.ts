@@ -39,6 +39,7 @@ export const apiUrls = {
   permissionModules: `${apiBaseUrl}/permission/modules`,
   createRole: `${apiBaseUrl}/role/`,
   updateRole: (roleId: string) => `${apiBaseUrl}/role/${roleId}`,
+  deleteRole: (roleId: string) => `${apiBaseUrl}/role/${roleId}`,
   accidentReports: `${apiBaseUrl}/accident/all`,
   accidentReportById: (reportId: string) =>
     `${apiBaseUrl}/accident/${reportId}`,

@@ -84,7 +84,6 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
   )
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState(existingTip?.image ?? '')
-  const [coverImage, setCoverImage] = useState(existingTip?.image ?? '')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const editorConfig = useMemo(
@@ -123,7 +122,6 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
     reader.onload = () => {
       const imageValue = String(reader.result ?? '')
       setImagePreview(imageValue)
-      setCoverImage(imageValue)
     }
     reader.readAsDataURL(file)
   }
@@ -148,7 +146,7 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
       !title.trim() ||
       !excerpt.trim() ||
       !plainDescription ||
-      (!imageFile && !coverImage.trim()) ||
+      (!imageFile && !existingTip?.image) ||
       !category.trim() ||
       !readTime
     ) {
@@ -168,9 +166,6 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
     formData.append('readTimeLabel', `${Number(readTime)} min read`)
     formData.append('status', 'published')
     if (imageFile) formData.append('coverImage', imageFile)
-    else if (!isEditing || coverImage.trim() !== existingTip?.image) {
-      formData.append('coverImage', coverImage.trim())
-    }
     const requestFailureMessage = isEditing
       ? 'Unable to update safety tip.'
       : 'Unable to create safety tip.'
@@ -307,17 +302,6 @@ const CreateSafetyTip = ({ mode }: SafetyTipFormProps) => {
             <p className="mb-2 text-small font-semibold text-text">
               Cover Image <span className="text-primary">*</span>
             </p>
-            <input
-              type="url"
-              value={coverImage}
-              onChange={(event) => {
-                setCoverImage(event.target.value)
-                setImagePreview(event.target.value)
-              }}
-              readOnly={isViewMode}
-              placeholder="Enter cover image URL"
-              className="mb-2 h-11 w-full rounded-lg border border-border bg-white px-3 text-small text-text outline-none transition-colors focus:border-primary"
-            />
             <label
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleDrop}

@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
+import DeleteConfirmationModal from '../../components/baseComponents/DeleteConfirmationModal'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
 import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
@@ -68,6 +69,7 @@ const EmergencyHelplines = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState('latest')
   const [deletingId, setDeletingId] = useState('')
+  const [helplinePendingDelete, setHelplinePendingDelete] = useState<EmergencyHelpline | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const helplinesPerPage = 10
 
@@ -157,8 +159,6 @@ const EmergencyHelplines = () => {
   }
 
   const deleteHelpline = async (helpline: EmergencyHelpline) => {
-    if (!window.confirm(`Delete ${helpline.name}?`)) return
-
     try {
       setDeletingId(helpline._id)
       dispatch(setHelplineError(''))
@@ -176,6 +176,7 @@ const EmergencyHelplines = () => {
       }
     } finally {
       setDeletingId('')
+      setHelplinePendingDelete(null)
     }
   }
 
@@ -218,7 +219,7 @@ const EmergencyHelplines = () => {
         <div className="flex items-center gap-1">
           <button type="button" title="View helpline" onClick={() => navigate(`/emergency-helplines/view/${helpline._id}`, { state: { helpline } })} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={17} /></button>
           {canUpdateHelplines && <button type="button" title="Edit helpline" onClick={() => navigate(`/emergency-helplines/edit/${helpline._id}`, { state: { helpline } })} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Pencil size={16} /></button>}
-          {canDeleteHelplines && <button type="button" title="Delete helpline" disabled={deletingId === helpline._id} onClick={() => void deleteHelpline(helpline)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft disabled:opacity-50">{deletingId === helpline._id ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}</button>}
+          {canDeleteHelplines && <button type="button" title="Delete helpline" disabled={deletingId === helpline._id} onClick={() => setHelplinePendingDelete(helpline)} className="flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-soft disabled:opacity-50">{deletingId === helpline._id ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}</button>}
         </div>
       ),
     },
@@ -260,6 +261,16 @@ const EmergencyHelplines = () => {
           <Pagination currentPage={activePage} totalPages={totalPages} totalItems={filteredHelplines.length} pageSize={helplinesPerPage} currentItemCount={paginatedHelplines.length} itemLabel="helplines" onPageChange={setCurrentPage} />
         </div>
       </div>
+      <DeleteConfirmationModal
+        isOpen={Boolean(helplinePendingDelete)}
+        title="Delete emergency helpline?"
+        message={helplinePendingDelete ? `${helplinePendingDelete.name} will be permanently removed and will no longer be available to users.` : ''}
+        isDeleting={deletingId === helplinePendingDelete?._id}
+        onCancel={() => setHelplinePendingDelete(null)}
+        onConfirm={() => {
+          if (helplinePendingDelete) void deleteHelpline(helplinePendingDelete)
+        }}
+      />
     </div>
   )
 }

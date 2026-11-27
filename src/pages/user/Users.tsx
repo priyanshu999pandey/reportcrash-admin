@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DateRangePicker from '../../components/baseComponents/DateRangePicker'
 import ApiImage from '../../components/baseComponents/ApiImage'
+import DeleteConfirmationModal from '../../components/baseComponents/DeleteConfirmationModal'
 import FilterSelect from '../../components/baseComponents/FilterSelect'
 import Pagination from '../../components/baseComponents/Pagination'
 import SearchBar from '../../components/baseComponents/SearchBar'
@@ -74,6 +75,7 @@ const Users = ({ currentRole }: UsersProps) => {
   const [datePickerKey, setDatePickerKey] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [deletingUserId, setDeletingUserId] = useState('')
+  const [userPendingDelete, setUserPendingDelete] = useState<UserApiItem | null>(null)
   const [assigningUser, setAssigningUser] = useState<UserApiItem | null>(null)
   const [selectedRoleId, setSelectedRoleId] = useState('')
   const [isAssigningRole, setIsAssigningRole] = useState(false)
@@ -234,8 +236,6 @@ const Users = ({ currentRole }: UsersProps) => {
   }
 
   const deleteUser = async (user: UserApiItem) => {
-    if (!window.confirm(`Delete ${getDisplayName(user)}?`)) return
-
     setDeletingUserId(user.id)
     setActionError('')
 
@@ -274,6 +274,7 @@ const Users = ({ currentRole }: UsersProps) => {
       )
     } finally {
       setDeletingUserId('')
+      setUserPendingDelete(null)
     }
   }
 
@@ -348,7 +349,7 @@ const Users = ({ currentRole }: UsersProps) => {
         profile: <span className={`inline-flex rounded-full px-2.5 py-1 font-semibold ${user.isProfileComplete ? 'bg-chart-green-soft text-chart-green-dark' : 'bg-chart-amber-soft text-chart-amber-dark'}`}>{user.isProfileComplete ? 'Complete' : 'Incomplete'}</span>,
         status: <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${user.isActive ? 'bg-chart-green-soft text-chart-green-dark' : 'bg-accent-soft text-accent'}`}><span className={`h-1.5 w-1.5 rounded-full ${user.isActive ? 'bg-chart-green-dark' : 'bg-accent'}`} />{profile.status}</span>,
         createdOn: profile.createdOn,
-        actions: <div className="flex items-center gap-1"><button type="button" title="View profile" onClick={() => navigate(`/users/view/${user.id}`, { state: { user: profile } })} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={18} /></button>{canUpdateUsers && <button type="button" title="Assign or change admin role" disabled={isLoadingRoles} onClick={() => openRoleAssignment(user)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-50">{isLoadingRoles ? <LoaderCircle size={17} className="animate-spin" /> : <Pencil size={17} />}</button>}{canDeleteUsers && <button type="button" title="Delete user" disabled={deletingUserId === user.id} onClick={() => void deleteUser(user)} className="flex h-8 w-8 items-center justify-center rounded-full text-accent transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60">{deletingUserId === user.id ? <LoaderCircle size={17} className="animate-spin" /> : <Trash2 size={17} />}</button>}</div>,
+        actions: <div className="flex items-center gap-1"><button type="button" title="View profile" onClick={() => navigate(`/users/view/${user.id}`, { state: { user: profile } })} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary"><Eye size={18} /></button>{canUpdateUsers && <button type="button" title="Assign or change admin role" disabled={isLoadingRoles} onClick={() => openRoleAssignment(user)} className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-50">{isLoadingRoles ? <LoaderCircle size={17} className="animate-spin" /> : <Pencil size={17} />}</button>}{canDeleteUsers && <button type="button" title="Delete user" disabled={deletingUserId === user.id} onClick={() => setUserPendingDelete(user)} className="flex h-8 w-8 items-center justify-center rounded-full text-accent transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60">{deletingUserId === user.id ? <LoaderCircle size={17} className="animate-spin" /> : <Trash2 size={17} />}</button>}</div>,
       },
     }
   })
@@ -385,6 +386,16 @@ const Users = ({ currentRole }: UsersProps) => {
           </div>
         </div>
       )}
+      <DeleteConfirmationModal
+        isOpen={Boolean(userPendingDelete)}
+        title="Delete user?"
+        message={userPendingDelete ? `${getDisplayName(userPendingDelete)} and their account data will be permanently removed. This action cannot be undone.` : ''}
+        isDeleting={deletingUserId === userPendingDelete?.id}
+        onCancel={() => setUserPendingDelete(null)}
+        onConfirm={() => {
+          if (userPendingDelete) void deleteUser(userPendingDelete)
+        }}
+      />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/baseComponents/Button'
+import DeleteConfirmationModal from '../../components/baseComponents/DeleteConfirmationModal'
 import { apiUrls } from '../../config/api'
 import { removeHelpline, setHelplines } from '../../store/helplineSlice'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
@@ -53,6 +54,7 @@ const EmergencyHelplineDetails = () => {
   )
   const [isLoading, setIsLoading] = useState(!existingHelpline)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -95,7 +97,7 @@ const EmergencyHelplineDetails = () => {
   }, [dispatch, existingHelpline, helplineId])
 
   const deleteHelpline = async () => {
-    if (!helpline || !window.confirm(`Delete ${helpline.name}?`)) return
+    if (!helpline) return
 
     try {
       setIsDeleting(true)
@@ -111,6 +113,7 @@ const EmergencyHelplineDetails = () => {
       }
     } finally {
       setIsDeleting(false)
+      setIsDeleteConfirmationOpen(false)
     }
   }
 
@@ -137,7 +140,7 @@ const EmergencyHelplineDetails = () => {
           <button type="button" onClick={() => navigate('/emergency-helplines')} className="inline-flex items-center gap-2 text-small font-semibold text-text-muted transition-colors hover:text-primary"><ArrowLeft size={16} />Emergency Helplines <span>/</span><strong className="text-text">Helpline Details</strong></button>
           <div className="flex flex-wrap gap-2">
             {canUpdateHelplines && <Button variant="outline" size="small" onClick={() => navigate(`/emergency-helplines/edit/${helpline._id}`, { state: { helpline } })} className="gap-2"><Pencil size={15} />Edit Helpline</Button>}
-            {canDeleteHelplines && <Button variant="red" size="small" disabled={isDeleting} onClick={() => void deleteHelpline()} className="gap-2">{isDeleting ? <LoaderCircle size={15} className="animate-spin" /> : <Trash2 size={15} />}{isDeleting ? 'Deleting...' : 'Delete Helpline'}</Button>}
+            {canDeleteHelplines && <Button variant="red" size="small" disabled={isDeleting} onClick={() => setIsDeleteConfirmationOpen(true)} className="gap-2">{isDeleting ? <LoaderCircle size={15} className="animate-spin" /> : <Trash2 size={15} />}{isDeleting ? 'Deleting...' : 'Delete Helpline'}</Button>}
           </div>
         </div>
 
@@ -182,6 +185,14 @@ const EmergencyHelplineDetails = () => {
           </div>
         </div>
       </div>
+      <DeleteConfirmationModal
+        isOpen={isDeleteConfirmationOpen}
+        title="Delete emergency helpline?"
+        message={`${helpline.name} will be permanently removed and will no longer be available to users.`}
+        isDeleting={isDeleting}
+        onCancel={() => setIsDeleteConfirmationOpen(false)}
+        onConfirm={() => void deleteHelpline()}
+      />
     </div>
   )
 }
